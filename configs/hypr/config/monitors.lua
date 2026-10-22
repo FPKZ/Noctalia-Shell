@@ -1,20 +1,8 @@
 -- Monitor wiki https://wiki.hypr.land/Configuring/Basics/Monitors/
+-- Exemplo: a saída de vídeo pode ser verificada com `hyprctl monitors`.
+-- Para fixar resoluções ou taxas específicas, ajuste aqui ou via painel Noctalia / HVE.
 
-hl.monitor({
-    output    = MONITOR1,
-    mode      = "1920x1080@100",
-    position  = "0x0",
-    scale     = "1",
-})
-
-hl.monitor({
-    output    = MONITOR2,
-    mode      = "1920x1080@74.97",
-    position  = "1920x0",
-    scale     = "1",
-})
-
--- Regra universal / fallback para qualquer monitor novo, laptop ou tela desconectada:
+-- Regra universal Plug & Play para qualquer monitor, laptop ou múltiplos displays:
 hl.monitor({
     output    = "",
     mode      = "preferred",

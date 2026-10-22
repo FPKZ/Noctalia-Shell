@@ -12,17 +12,31 @@ echo "=========================================================="
 echo ""
 
 # 1. Verificar e instalar pacotes necessários
-echo "-> [1/7] Verificando e instalando pacotes base no CachyOS/Arch..."
+echo "-> [1/7] Verificando e instalando componentes do Hyprland e Noctalia..."
 if command -v pacman >/dev/null 2>&1; then
-    if pacman -Si cachyos-hypr-noctalia >/dev/null 2>&1; then
-        echo "Instalando cachyos-hypr-noctalia via repositório CachyOS..."
-        sudo pacman -S --needed --noconfirm cachyos-hypr-noctalia || sudo pacman -S --needed cachyos-hypr-noctalia
-    else
-        echo "Repositório do CachyOS não detectado; instalando dependências base..."
-        sudo pacman -S --needed --noconfirm hyprland kitty dolphin qt6ct grim slurp wl-clipboard uwsm
-    fi
-    # Garantir kdeconnect
-    sudo pacman -S --needed --noconfirm kdeconnect || true
+    # Lista atômica de pacotes para evitar conflitos de meta-pacotes com KDE Plasma
+    PACKAGES=(
+        hyprland
+        noctalia
+        swash
+        kitty
+        dolphin
+        qt6ct
+        grim
+        slurp
+        wl-clipboard
+        uwsm
+        hyprpicker
+        xdg-desktop-portal-hyprland
+        xorg-xhost
+        adw-gtk-theme
+        kde-cli-tools
+        kdeconnect
+        python3
+    )
+    echo "Instalando pacotes base..."
+    sudo pacman -S --needed --noconfirm "${PACKAGES[@]}"
+
     # Garantir audiorelay via AUR (yay/paru) se disponível
     if command -v yay >/dev/null 2>&1; then
         echo "Instalando audiorelay via yay..."
@@ -96,13 +110,6 @@ fi
 # Ativar serviço em segundo plano do KDE Connect no systemd user
 systemctl --user daemon-reload 2>/dev/null || true
 systemctl --user enable --now kdeconnect.service 2>/dev/null || true
-
-# Configurar autostart do AudioRelay no Hyprland
-if [ -f "$TARGET_HOME/.config/hypr/config/autostart.lua" ]; then
-    if ! grep -q "setup-audiorelay.sh" "$TARGET_HOME/.config/hypr/config/autostart.lua"; then
-        echo 'exec-once = "$HOME/.local/bin/setup-audiorelay.sh"' >> "$TARGET_HOME/.config/hypr/config/autostart.lua" 2>/dev/null || true
-    fi
-fi
 
 # Configurar integração SSH no shell Fish
 if [ -f "$TARGET_HOME/.config/fish/config.fish" ]; then
