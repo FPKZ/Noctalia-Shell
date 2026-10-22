@@ -1,0 +1,7 @@
+# Pacotes e temporários
+*.tar.gz
+*.bak*
+*.log
+.DS_Store
+__pycache__/
+*.pyc

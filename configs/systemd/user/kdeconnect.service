@@ -1,0 +1,12 @@
+[Unit]
+Description=KDE Connect Daemon
+After=network.target
+
+[Service]
+Environment=QT_LOGGING_RULES=kdeconnect*=true
+ExecStart=/usr/bin/kdeconnectd --replace
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
