@@ -13,12 +13,32 @@
 import os
 import re
 import sys
+import unicodedata
 import configparser
 
 CONFIG_DIR = os.path.expanduser("~/.config")
 HYPR_DIR = os.path.join(CONFIG_DIR, "hypr")
 BINDS_LUA = os.path.join(HYPR_DIR, "config/binds.lua")
 KGLOBAL_SRC = os.path.join(CONFIG_DIR, "kglobalshortcutsrc")
+
+def get_display_width(s: str) -> int:
+    """Calcula a largura real de exibição em células de terminal monospace."""
+    w = 0
+    for ch in s:
+        if ch in ('\ufe0f', '\ufe0e'):  # Variation Selectors
+            continue
+        eaw = unicodedata.east_asian_width(ch)
+        if eaw in ('W', 'F'):
+            w += 2
+        else:
+            w += 1
+    return w
+
+def pad_display(s: str, width: int) -> str:
+    """Preenche com espaços considerando a largura visual real de cada caractere/emoji."""
+    cur_w = get_display_width(s)
+    pad = max(0, width - cur_w)
+    return s + (' ' * pad)
 
 ACTION_MAP = {
     # Janelas Hyprland
@@ -43,6 +63,9 @@ ACTION_MAP = {
     "window.drag": ("🖱️ [HYPR: MOUSE]", "Mover janela arrastando com botão esquerdo"),
     "window.resize()": ("🖱️ [HYPR: MOUSE]", "Redimensionar janela arrastando com botão direito"),
     "window.resize": ("🪟 [HYPR: JANELA]", "Redimensionar janela ativa via teclado"),
+    # Zoom
+    "zoomfunction(-": ("🔍 [HYPR: ZOOM]", "Diminuir zoom geral da tela (Zoom Out)"),
+    "zoomfunction(": ("🔍 [HYPR: ZOOM]", "Aumentar zoom geral da tela (Zoom In)"),
     "zoomfunction": ("🔍 [HYPR: ZOOM]", "Aumentar ou diminuir zoom geral da tela"),
 
     # Workspaces
@@ -126,12 +149,14 @@ def extract_hypr_binds():
             continue
 
         if "hl.bind(" in line:
-            m = re.search(r'hl\.bind\s*\(\s*([^,]+?)\s*,\s*(.+?)\s*\)', line)
-            if not m:
+            idx = line.find("hl.bind(")
+            content = line[idx + 8:].rstrip()
+            parts = content.split(",", 1)
+            if len(parts) < 2:
                 continue
 
-            raw_key = m.group(1).strip()
-            raw_action = m.group(2).strip()
+            raw_key = parts[0].strip()
+            raw_action = parts[1].strip()
 
             if "digitCode" in raw_key:
                 last_comment = ""
@@ -251,7 +276,8 @@ def extract_kde_binds():
 
     return items
 
-def main():
+def get_all_binds():
+    """Retorna a lista completa e estruturada de atalhos de todo o sistema."""
     all_binds = []
 
     # 1. Hyprland & Noctalia Shell
@@ -268,12 +294,18 @@ def main():
 
     # 5. KDE Plasma (Global)
     kde_binds = extract_kde_binds()
-    # Adicionar até 10 atalhos principais do KDE para não poluir
     if kde_binds:
         all_binds.extend(kde_binds[:12])
 
+    return all_binds
+
+def main():
+    all_binds = get_all_binds()
+
     for cat, key, desc in all_binds:
-        print(f"{cat:<23} │ {key:<30} ➜  {desc}")
+        cat_pad = pad_display(cat, 24)
+        key_pad = pad_display(key, 36)
+        print(f"{cat_pad} │ {key_pad} ➜  {desc}")
 
 if __name__ == "__main__":
     main()
