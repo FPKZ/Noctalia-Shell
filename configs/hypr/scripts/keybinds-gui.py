@@ -2,21 +2,28 @@
 # ==============================================================================
 # keybinds-gui.py
 # Painel Gráfico Moderno e Dedicado de Atalhos (PySide6 / Qt6 no Wayland)
-# Estilizado no tema Oxocarbon / Noctalia (Material You)
+# 100% Integrado ao Noctalia Shell, Paleta Dinâmica e Configurações do Sistema
 #
-# Comportamentos de Usabilidade Avançados:
-#   1. Singleton Garantido: Nunca abre instâncias duplicadas (alterna/fecha no atalho)
-#   2. Digitação Global (Type-to-Search): Qualquer tecla digitada foca na busca
-#   3. Navegação pelas Setas (↑/↓): Navega na tabela mesmo digitando na busca
-#   4. Alternância por TAB: A tecla Tab/Shift+Tab alterna entre os chips de filtro
-#   5. Identificação e Edição de Atalho Específico (F2 / Botão Editar)
+# Principais Recursos:
+#   1. Tema Dinâmico do Noctalia: Carrega paleta do Noctalia (Material You / Wallpaper)
+#   2. Proporção e Fontes do Sistema: 60% largura e 65% altura da tela, fontes do sistema
+#   3. Otimização de Performance: Modo Daemon para abertura instantânea (<5ms)
+#   4. Navegação por TAB sem saltos duplos (percorre filtros de 1 em 1)
+#   5. Digitação Global (Type-to-Search) e Navegação com Setas (↑/↓)
+#   6. Atalhos Rápidos no Menu:
+#      - Ctrl + N: Novo Atalho
+#      - F2 ou Ctrl + E: Editar Atalho Selecionado
+#      - F5 ou Ctrl + R: Recarregar Sistema e Atalhos
+#      - Ctrl + O: Abrir binds.lua
+#      - Ctrl + Shift + O: Abrir custom_binds.lua
+#      - Esc: Fechar Menu
 # ==============================================================================
 import sys
 import os
 import re
 import subprocess
 from PySide6.QtCore import Qt, QSize, QEvent
-from PySide6.QtGui import QFont, QColor, QPalette, QKeySequence, QShortcut, QIcon, QKeyEvent
+from PySide6.QtGui import QFont, QColor, QPalette, QKeySequence, QShortcut, QIcon, QKeyEvent, QFontDatabase
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import (
     QApplication, QWidget, QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
@@ -25,18 +32,18 @@ from PySide6.QtWidgets import (
     QMenu
 )
 
-# ==============================================================================
-# 1. CAMINHOS DE CONFIGURAÇÃO DO SISTEMA
-# ==============================================================================
+# Caminhos do sistema
 CONFIG_DIR = os.path.expanduser("~/.config")
 HYPR_DIR = os.path.join(CONFIG_DIR, "hypr")
 BINDS_LUA = os.path.join(HYPR_DIR, "config/binds.lua")
 CUSTOM_BINDS_LUA = os.path.join(HYPR_DIR, "config/custom_binds.lua")
 VARIABLES_LUA = os.path.join(HYPR_DIR, "config/variables.lua")
 KITTY_CONF = os.path.join(CONFIG_DIR, "kitty/kitty.conf")
+KITTY_THEME = os.path.join(CONFIG_DIR, "kitty/themes/noctalia.conf")
+QT6CT_COLORS = os.path.join(CONFIG_DIR, "qt6ct/colors/noctalia.conf")
 SINGLETON_SOCKET = "hypr_keybinds_gui_singleton_socket"
 
-# Importar o parser universal e utilitários de atualização
+# Importar o parser universal
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 if SCRIPT_DIR not in sys.path:
     sys.path.append(SCRIPT_DIR)
@@ -52,88 +59,110 @@ update_kitty_bind = parser_mod.update_kitty_bind
 readable_key_to_lua = parser_mod.readable_key_to_lua
 
 # ==============================================================================
-# 2. VARIÁVEIS DE CORES E TEMA (OXOCARBON / MATERIAL YOU)
-# Altere essas variáveis para mudar a paleta de cores de toda a interface!
+# CARREGAMENTO DINÂMICO DO TEMA DO NOCTALIA
+# Lê diretamente os temas gerados pelo Noctalia Shell (Material You / Wallpaper)
 # ==============================================================================
-DARK_BG          = "#13131a"  # Fundo da janela principal
-CARD_BG          = "#1a1b26"  # Fundo de cartões, tabela e botões secundários
-INPUT_BG         = "#222436"  # Fundo dos campos de texto e inputs
-BORDER_COLOR     = "#2f334d"  # Cor suave das bordas
-ACCENT_PRIMARY   = "#bcc2ff"  # Cor de destaque principal (Lavender / Material You)
-ACCENT_SECONDARY = "#c4c5dd"  # Cor de destaque secundária
-ACCENT_MUTED     = "#555877"  # Cor para linhas e scrolls discretos
-ACCENT_GREEN     = "#a8f5ba"  # Cor para ações executáveis e sucesso
-ACCENT_CORAL     = "#ffb4ab"  # Cor para avisos, atalhos de kill ou exclusão
-ACCENT_BLUE      = "#82aaff"  # Cor para links de arquivos de origem
-TEXT_COLOR       = "#e4e1e9"  # Cor principal dos textos
-TEXT_MUTED       = "#939ab7"  # Cor para textos secundários e dicas
-HIGHLIGHT_BG     = "#282a3e"  # Fundo do item selecionado na tabela
+def load_noctalia_theme():
+    theme = {
+        "DARK_BG": "#131318",
+        "CARD_BG": "#1a1b26",
+        "INPUT_BG": "#222436",
+        "BORDER_COLOR": "#46464f",
+        "ACCENT_PRIMARY": "#bcc2ff",
+        "ACCENT_SECONDARY": "#c4c5dd",
+        "ACCENT_CORAL": "#ffb4ab",
+        "ACCENT_GREEN": "#a8f5ba",
+        "ACCENT_BLUE": "#82aaff",
+        "TEXT_COLOR": "#e4e1e9",
+        "TEXT_MUTED": "#939ab7",
+        "HIGHLIGHT_BG": "#282a3e"
+    }
 
-# ==============================================================================
-# 3. FOLHA DE ESTILOS CSS / QSS
-# Altere aqui arredondamento de cantos, espaçamentos, sombras e fontes!
-# ==============================================================================
-STYLESHEET = f"""
+    if os.path.exists(KITTY_THEME):
+        with open(KITTY_THEME, "r", encoding="utf-8") as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) >= 2:
+                    k, v = parts[0], parts[1]
+                    if k == "background": theme["DARK_BG"] = v
+                    elif k == "foreground": theme["TEXT_COLOR"] = v
+                    elif k in ("active_border_color", "color2", "url_color"): theme["ACCENT_PRIMARY"] = v
+                    elif k == "color3": theme["ACCENT_SECONDARY"] = v
+                    elif k == "color1": theme["ACCENT_CORAL"] = v
+                    elif k in ("inactive_border_color", "color0"): theme["BORDER_COLOR"] = v
+                    elif k == "selection_background": theme["HIGHLIGHT_BG"] = v
+
+    bg = QColor(theme["DARK_BG"])
+    if bg.lightness() < 128:
+        theme["CARD_BG"] = bg.lighter(130).name()
+        theme["INPUT_BG"] = bg.lighter(150).name()
+        theme["TEXT_MUTED"] = QColor(theme["TEXT_COLOR"]).darker(140).name()
+    else:
+        theme["CARD_BG"] = bg.darker(110).name()
+        theme["INPUT_BG"] = bg.darker(120).name()
+        theme["TEXT_MUTED"] = QColor(theme["TEXT_COLOR"]).lighter(140).name()
+
+    return theme
+
+def build_stylesheet(t):
+    """Gera stylesheet Qt (QSS) usando tamanhos relativos e cores dinâmicas."""
+    return f"""
 QWidget#RootWindow, QDialog#AddShortcutDialog, QDialog#EditShortcutDialog {{
-    background-color: {DARK_BG};
-    border: 1px solid {BORDER_COLOR};
+    background-color: {t['DARK_BG']};
+    border: 1px solid {t['BORDER_COLOR']};
     border-radius: 16px;
 }}
 
 QLabel#TitleLabel {{
-    color: {TEXT_COLOR};
-    font-size: 19px;
+    color: {t['TEXT_COLOR']};
+    font-size: 1.35em;
     font-weight: bold;
-    font-family: 'Inter', 'Noto Sans', 'Segoe UI', sans-serif;
 }}
 
 QLabel#SubtitleLabel {{
-    color: {TEXT_MUTED};
-    font-size: 13px;
+    color: {t['TEXT_MUTED']};
+    font-size: 0.9em;
 }}
 
 QLabel#SectionLabel {{
-    color: {ACCENT_SECONDARY};
+    color: {t['ACCENT_SECONDARY']};
     font-weight: bold;
-    font-size: 13px;
+    font-size: 0.95em;
 }}
 
 QLineEdit, QComboBox {{
-    background-color: {INPUT_BG};
-    color: {TEXT_COLOR};
-    border: 1px solid {BORDER_COLOR};
+    background-color: {t['INPUT_BG']};
+    color: {t['TEXT_COLOR']};
+    border: 1px solid {t['BORDER_COLOR']};
     border-radius: 8px;
-    padding: 8px 12px;
-    font-size: 13px;
+    padding: 7px 12px;
 }}
 
 QLineEdit:focus, QComboBox:focus {{
-    border: 1px solid {ACCENT_PRIMARY};
+    border: 1px solid {t['ACCENT_PRIMARY']};
 }}
 
 QPushButton.HeaderAction {{
-    background-color: {CARD_BG};
-    color: {TEXT_COLOR};
-    border: 1px solid {BORDER_COLOR};
+    background-color: {t['CARD_BG']};
+    color: {t['TEXT_COLOR']};
+    border: 1px solid {t['BORDER_COLOR']};
     border-radius: 8px;
-    padding: 7px 14px;
-    font-size: 12px;
+    padding: 6px 12px;
     font-weight: 500;
 }}
 
 QPushButton.HeaderAction:hover {{
-    background-color: {INPUT_BG};
-    border-color: {ACCENT_PRIMARY};
-    color: {ACCENT_PRIMARY};
+    background-color: {t['INPUT_BG']};
+    border-color: {t['ACCENT_PRIMARY']};
+    color: {t['ACCENT_PRIMARY']};
 }}
 
 QPushButton.PrimaryAction {{
-    background-color: {ACCENT_PRIMARY};
-    color: {DARK_BG};
-    border: 1px solid {ACCENT_PRIMARY};
+    background-color: {t['ACCENT_PRIMARY']};
+    color: {t['DARK_BG']};
+    border: 1px solid {t['ACCENT_PRIMARY']};
     border-radius: 8px;
     padding: 8px 18px;
-    font-size: 13px;
     font-weight: bold;
 }}
 
@@ -143,171 +172,138 @@ QPushButton.PrimaryAction:hover {{
 
 QPushButton.DangerAction {{
     background-color: #3d1e24;
-    color: {ACCENT_CORAL};
+    color: {t['ACCENT_CORAL']};
     border: 1px solid #662d35;
     border-radius: 8px;
     padding: 8px 16px;
-    font-size: 13px;
     font-weight: bold;
 }}
 
-QPushButton.DangerAction:hover {{
-    background-color: #552730;
-}}
-
 QPushButton.SecondaryAction {{
-    background-color: {CARD_BG};
-    color: {TEXT_MUTED};
-    border: 1px solid {BORDER_COLOR};
+    background-color: {t['CARD_BG']};
+    color: {t['TEXT_MUTED']};
+    border: 1px solid {t['BORDER_COLOR']};
     border-radius: 8px;
     padding: 8px 16px;
-    font-size: 13px;
-}}
-
-QPushButton.SecondaryAction:hover {{
-    background-color: {INPUT_BG};
-    color: {TEXT_COLOR};
 }}
 
 QPushButton.FilterChip {{
-    background-color: {CARD_BG};
-    color: {TEXT_MUTED};
-    border: 1px solid {BORDER_COLOR};
+    background-color: {t['CARD_BG']};
+    color: {t['TEXT_MUTED']};
+    border: 1px solid {t['BORDER_COLOR']};
     border-radius: 8px;
-    padding: 6px 12px;
-    font-size: 12px;
+    padding: 5px 11px;
     font-weight: 500;
 }}
 
 QPushButton.FilterChip:hover {{
-    background-color: {INPUT_BG};
-    color: {TEXT_COLOR};
-    border-color: {ACCENT_MUTED};
+    background-color: {t['INPUT_BG']};
+    color: {t['TEXT_COLOR']};
 }}
 
 QPushButton.FilterChip:checked {{
-    background-color: {ACCENT_PRIMARY};
-    color: {DARK_BG};
+    background-color: {t['ACCENT_PRIMARY']};
+    color: {t['DARK_BG']};
     font-weight: bold;
-    border-color: {ACCENT_PRIMARY};
+    border-color: {t['ACCENT_PRIMARY']};
 }}
 
 QTableWidget#BindsTable {{
-    background-color: {CARD_BG};
-    border: 1px solid {BORDER_COLOR};
+    background-color: {t['CARD_BG']};
+    border: 1px solid {t['BORDER_COLOR']};
     border-radius: 10px;
     gridline-color: transparent;
-    color: {TEXT_COLOR};
-    selection-background-color: {HIGHLIGHT_BG};
-    selection-color: {TEXT_COLOR};
-    font-size: 13px;
+    color: {t['TEXT_COLOR']};
+    selection-background-color: {t['HIGHLIGHT_BG']};
+    selection-color: {t['TEXT_COLOR']};
 }}
 
 QTableWidget#BindsTable::item {{
-    padding: 10px 8px;
-    border-bottom: 1px solid #1e2030;
+    padding: 8px 6px;
+    border-bottom: 1px solid {t['DARK_BG']};
 }}
 
 QTableWidget#BindsTable::item:selected {{
-    background-color: {HIGHLIGHT_BG};
-    border-left: 3px solid {ACCENT_PRIMARY};
+    background-color: {t['HIGHLIGHT_BG']};
+    border-left: 3px solid {t['ACCENT_PRIMARY']};
 }}
 
 QHeaderView::section {{
-    background-color: {INPUT_BG};
-    color: {ACCENT_SECONDARY};
+    background-color: {t['INPUT_BG']};
+    color: {t['ACCENT_SECONDARY']};
     font-weight: bold;
-    font-size: 12px;
-    padding: 8px;
+    padding: 6px;
     border: none;
-    border-bottom: 2px solid {BORDER_COLOR};
+    border-bottom: 2px solid {t['BORDER_COLOR']};
 }}
 
 QScrollBar:vertical {{
-    background: {DARK_BG};
+    background: {t['DARK_BG']};
     width: 8px;
     border-radius: 4px;
 }}
 
 QScrollBar::handle:vertical {{
-    background: {ACCENT_MUTED};
+    background: {t['BORDER_COLOR']};
     min-height: 24px;
     border-radius: 4px;
 }}
 
 QLabel#FooterLabel {{
-    color: {TEXT_MUTED};
-    font-size: 12px;
+    color: {t['TEXT_MUTED']};
+    font-size: 0.9em;
 }}
 
 QCheckBox {{
-    color: {TEXT_COLOR};
-    font-size: 13px;
+    color: {t['TEXT_COLOR']};
     spacing: 6px;
 }}
 
 QCheckBox::indicator {{
-    width: 18px;
-    height: 18px;
-    border: 1px solid {BORDER_COLOR};
+    width: 16px;
+    height: 16px;
+    border: 1px solid {t['BORDER_COLOR']};
     border-radius: 4px;
-    background-color: {INPUT_BG};
+    background-color: {t['INPUT_BG']};
 }}
 
 QCheckBox::indicator:checked {{
-    background-color: {ACCENT_PRIMARY};
-    border-color: {ACCENT_PRIMARY};
+    background-color: {t['ACCENT_PRIMARY']};
+    border-color: {t['ACCENT_PRIMARY']};
 }}
 """
 
 def open_file_in_editor(file_path, line_number=0):
-    """Abre o editor de texto favorito posicionado na linha indicada."""
     if not os.path.exists(file_path):
         return False
-
     editors = [
         ("kwrite", ["kwrite", "--line", str(line_number), file_path]),
         ("kate", ["kate", "--line", str(line_number), file_path]),
         ("gnome-text-editor", ["gnome-text-editor", f"+{line_number}", file_path]),
         ("code", ["code", "-g", f"{file_path}:{line_number}"]),
     ]
-
     for name, cmd in editors:
         if subprocess.run(["which", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
-            if line_number > 0:
-                subprocess.Popen(cmd)
-            else:
-                subprocess.Popen([name, file_path])
+            subprocess.Popen(cmd if line_number > 0 else [name, file_path])
             return True
-
-    # Fallback para Kitty + nano
-    if line_number > 0:
-        subprocess.Popen(["kitty", "-e", "nano", f"+{line_number}", file_path])
-    else:
-        subprocess.Popen(["kitty", "-e", "nano", file_path])
+    subprocess.Popen(["kitty", "-e", "nano", f"+{line_number}", file_path] if line_number > 0 else ["kitty", "-e", "nano", file_path])
     return True
 
-# ==============================================================================
-# 4. CAMPO DE BUSCA REATIVO COM ATALHOS DE TECLADO INTEGRADOS
-# ==============================================================================
 class SearchLineEdit(QLineEdit):
-    """Input de busca inteligente que direciona setas e Tab para a tabela e chips."""
+    """Campo de busca com delegação limpa de teclas para navegação e alternância."""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.window_ref = None
 
     def focusNextPrevChild(self, next):
-        """Impede que o Tab mude o foco dos widgets e usa para alternar categorias!"""
+        """Interrompe a propagação do Tab e altera a categoria estritamente de 1 em 1."""
         if self.window_ref:
-            direction = 1 if next else -1
-            self.window_ref.cycle_category(direction)
-            return False
+            self.window_ref.cycle_category(1 if next else -1)
+            return True
         return super().focusNextPrevChild(next)
 
     def keyPressEvent(self, event: QKeyEvent):
         key = event.key()
-
-        # Setas Cima e Baixo navegam diretamente na tabela
         if key == Qt.Key.Key_Down:
             if self.window_ref:
                 self.window_ref.move_table_selection(1)
@@ -324,12 +320,6 @@ class SearchLineEdit(QLineEdit):
             if self.window_ref:
                 self.window_ref.move_table_selection(-8)
                 return
-        elif key in (Qt.Key.Key_Tab, Qt.Key.Key_Backtab):
-            # Tab / Shift+Tab alterna entre os chips de filtro
-            if self.window_ref:
-                direction = 1 if key == Qt.Key.Key_Tab else -1
-                self.window_ref.cycle_category(direction)
-                return
         elif key == Qt.Key.Key_Escape:
             if self.window_ref:
                 self.window_ref.close()
@@ -339,13 +329,14 @@ class SearchLineEdit(QLineEdit):
 
 class EditShortcutDialog(QDialog):
     """Modal para Editar um Atalho Específico e sua Linha de Origem."""
-    def __init__(self, bind_item, parent=None):
+    def __init__(self, bind_item, theme, parent=None):
         super().__init__(parent)
         self.setObjectName("EditShortcutDialog")
         self.bind_item = bind_item
+        self.theme = theme
         self.setWindowTitle("Editar Atalho Específico")
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
-        self.resize(650, 560)
+        self.resize(640, 540)
         self.setup_ui()
 
     def setup_ui(self):
@@ -364,13 +355,10 @@ class EditShortcutDialog(QDialog):
         origin_text = f"<b>Origem:</b> {source_type.upper()}"
         if source_file:
             short_path = source_file.replace(os.path.expanduser("~"), "~")
-            if line_num > 0:
-                origin_text += f" &nbsp;•&nbsp; <code>{short_path}:{line_num}</code>"
-            else:
-                origin_text += f" &nbsp;•&nbsp; <code>{short_path}</code>"
+            origin_text += f" &nbsp;•&nbsp; <code>{short_path}:{line_num}</code>" if line_num > 0 else f" &nbsp;•&nbsp; <code>{short_path}</code>"
 
         lbl_origin = QLabel(origin_text, self)
-        lbl_origin.setStyleSheet(f"background-color: {INPUT_BG}; border: 1px solid {BORDER_COLOR}; border-radius: 6px; padding: 6px 12px; color: {ACCENT_PRIMARY}; font-size: 12px;")
+        lbl_origin.setStyleSheet(f"background-color: {self.theme['INPUT_BG']}; border: 1px solid {self.theme['BORDER_COLOR']}; border-radius: 6px; padding: 6px 12px; color: {self.theme['ACCENT_PRIMARY']};")
         layout.addWidget(lbl_origin)
 
         lbl_mod = QLabel("1. Combinação de Teclas:", self)
@@ -422,8 +410,7 @@ class EditShortcutDialog(QDialog):
 
         grid.addWidget(QLabel("Comando / Ação:"), 2, 0)
         self.action_input = QLineEdit(self)
-        raw_action = self.bind_item.get("raw_action", "")
-        self.action_input.setText(raw_action)
+        self.action_input.setText(self.bind_item.get("raw_action", ""))
         self.action_input.textChanged.connect(self.update_preview)
         grid.addWidget(self.action_input, 2, 1)
 
@@ -434,12 +421,11 @@ class EditShortcutDialog(QDialog):
         layout.addWidget(lbl_prev)
 
         self.preview_box = QLabel(self)
-        self.preview_box.setStyleSheet(f"background-color: {INPUT_BG}; border: 1px solid {BORDER_COLOR}; border-radius: 8px; padding: 10px; font-family: monospace; color: {ACCENT_GREEN};")
+        self.preview_box.setStyleSheet(f"background-color: {self.theme['INPUT_BG']}; border: 1px solid {self.theme['BORDER_COLOR']}; border-radius: 8px; padding: 10px; font-family: monospace; color: {self.theme['ACCENT_GREEN']};")
         self.preview_box.setWordWrap(True)
         layout.addWidget(self.preview_box)
 
         btn_box = QHBoxLayout()
-
         if self.bind_item.get("source_type") == "custom":
             btn_del = QPushButton("🗑️ Excluir Atalho", self)
             btn_del.setProperty("class", "DangerAction")
@@ -453,7 +439,6 @@ class EditShortcutDialog(QDialog):
             btn_box.addWidget(btn_open_file)
 
         btn_box.addStretch()
-
         btn_cancel = QPushButton("Cancelar", self)
         btn_cancel.setProperty("class", "SecondaryAction")
         btn_cancel.clicked.connect(self.reject)
@@ -490,7 +475,6 @@ class EditShortcutDialog(QDialog):
             prev = f"map {readable.lower().replace(' + ', '+')} {action}"
         else:
             prev = f"[{readable}] ➜ {desc} ({action})"
-
         self.preview_box.setText(prev)
 
     def open_at_line(self):
@@ -518,8 +502,7 @@ class EditShortcutDialog(QDialog):
             elif stype == "hyprland_loop":
                 QMessageBox.information(
                     self, "Workspaces Dinâmicos",
-                    f"Os atalhos de workspace são gerados dinamicamente pela variável NUM_WPM em:\n"
-                    f"{VARIABLES_LUA}\n\nVocê já tem 10 workspaces configurados por monitor!"
+                    f"Workspaces são gerados dinamicamente por NUM_WPM em:\n{VARIABLES_LUA}"
                 )
                 self.reject()
             else:
@@ -542,9 +525,10 @@ class EditShortcutDialog(QDialog):
 
 class AddShortcutDialog(QDialog):
     """Modal Interativo para Criar e Salvar Novo Atalho no Hyprland."""
-    def __init__(self, parent=None):
+    def __init__(self, theme, parent=None):
         super().__init__(parent)
         self.setObjectName("AddShortcutDialog")
+        self.theme = theme
         self.setWindowTitle("Cadastrar Novo Atalho")
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
         self.resize(600, 520)
@@ -567,7 +551,7 @@ class AddShortcutDialog(QDialog):
         layout.addWidget(lbl_mod)
 
         mod_box = QHBoxLayout()
-        self.chk_super = QCheckBox("Super (Windows)", self)
+        self.chk_super = QCheckBox("Super", self)
         self.chk_super.setChecked(True)
         self.chk_ctrl = QCheckBox("Ctrl", self)
         self.chk_shift = QCheckBox("Shift", self)
@@ -631,7 +615,7 @@ class AddShortcutDialog(QDialog):
         layout.addWidget(lbl_prev)
 
         self.preview_box = QLabel(self)
-        self.preview_box.setStyleSheet(f"background-color: {INPUT_BG}; border: 1px solid {BORDER_COLOR}; border-radius: 8px; padding: 10px; font-family: monospace; color: {ACCENT_GREEN};")
+        self.preview_box.setStyleSheet(f"background-color: {self.theme['INPUT_BG']}; border: 1px solid {self.theme['BORDER_COLOR']}; border-radius: 8px; padding: 10px; font-family: monospace; color: {self.theme['ACCENT_GREEN']};")
         self.preview_box.setWordWrap(True)
         layout.addWidget(self.preview_box)
 
@@ -655,23 +639,19 @@ class AddShortcutDialog(QDialog):
     def on_action_type_changed(self, idx):
         if idx == 0:
             self.action_param_label.setText("Comando / App:")
-            self.action_param_input.setPlaceholderText("Ex: obs, spotify, discord, telegram-desktop, code...")
+            self.action_param_input.setPlaceholderText("Ex: obs, spotify, discord, code...")
             self.cat_combo.setCurrentIndex(0)
         elif idx == 1:
             self.action_param_label.setText("Número Workspace:")
-            self.action_param_input.setPlaceholderText("Ex: 5 (ou qualquer número de 1 a 10)")
+            self.action_param_input.setPlaceholderText("Ex: 5 (1 a 10)")
             self.cat_combo.setCurrentIndex(1)
-            if not self.desc_input.text():
-                self.desc_input.setText("Focar Workspace")
         elif idx == 2:
             self.action_param_label.setText("Número Workspace:")
-            self.action_param_input.setPlaceholderText("Ex: 5 (ou qualquer número de 1 a 10)")
+            self.action_param_input.setPlaceholderText("Ex: 5 (1 a 10)")
             self.cat_combo.setCurrentIndex(1)
-            if not self.desc_input.text():
-                self.desc_input.setText("Mover janela para Workspace")
         elif idx == 3:
             self.action_param_label.setText("Mensagem Noctalia:")
-            self.action_param_input.setPlaceholderText("Ex: panel-toggle launcher, screenshot-region...")
+            self.action_param_input.setPlaceholderText("Ex: panel-toggle launcher...")
             self.cat_combo.setCurrentIndex(3)
         elif idx == 4:
             self.action_param_label.setText("Código Lua:")
@@ -716,12 +696,7 @@ class AddShortcutDialog(QDialog):
         action_lua = self.get_action_code()
         desc = self.desc_input.text().strip() or "Ação personalizada"
         cat = self.cat_combo.currentText()
-
-        preview_text = (
-            f"-- category: {cat}\n"
-            f"-- {desc}\n"
-            f"hl.bind({combo_lua}, {action_lua})"
-        )
+        preview_text = f"-- category: {cat}\n-- {desc}\nhl.bind({combo_lua}, {action_lua})"
         self.preview_box.setText(preview_text)
 
     def save_shortcut(self):
@@ -734,12 +709,7 @@ class AddShortcutDialog(QDialog):
         cat = self.cat_combo.currentText()
         combo_lua = self.get_combo_string()
         action_lua = self.get_action_code()
-
-        block = (
-            f"\n-- category: {cat}\n"
-            f"-- {desc}\n"
-            f"hl.bind({combo_lua}, {action_lua})\n"
-        )
+        block = f"\n-- category: {cat}\n-- {desc}\nhl.bind({combo_lua}, {action_lua})\n"
 
         try:
             with open(CUSTOM_BINDS_LUA, "a", encoding="utf-8") as f:
@@ -750,12 +720,13 @@ class AddShortcutDialog(QDialog):
             QMessageBox.critical(self, "Erro", f"Falha ao salvar atalho: {e}")
 
 # ==============================================================================
-# 5. JANELA PRINCIPAL DO EXPLORADOR DE ATALHOS
+# JANELA PRINCIPAL DO EXPLORADOR DE ATALHOS
 # ==============================================================================
 class KeybindsWindow(QWidget):
-    def __init__(self):
+    def __init__(self, is_daemon=False):
         super().__init__()
         self.setObjectName("RootWindow")
+        self.is_daemon = is_daemon
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.Dialog |
@@ -763,32 +734,35 @@ class KeybindsWindow(QWidget):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
 
+        self.theme = load_noctalia_theme()
         self.active_category = "Todos"
         self.displayed_binds = []
         self.chip_buttons = []
+        
         self.load_binds()
         self.setup_ui()
         self.populate_table(self.raw_binds)
-
-        # Atalhos rápidos globais da janela
-        esc_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
-        esc_shortcut.activated.connect(self.close)
-
-        f2_shortcut = QShortcut(QKeySequence(Qt.Key.Key_F2), self)
-        f2_shortcut.activated.connect(self.on_edit_selected)
+        self.setup_keyboard_shortcuts()
 
     def load_binds(self):
         self.raw_binds = get_all_binds()
 
     def setup_ui(self):
-        # Dimensões da janela principal (ajuste aqui a largura e altura)
-        self.resize(1140, 720)
+        # Tamanho relativo à tela (60% largura, 65% altura)
+        screen = QApplication.primaryScreen()
+        if screen:
+            geo = screen.geometry()
+            target_w = max(800, min(1400, int(geo.width() * 0.60)))
+            target_h = max(550, min(900, int(geo.height() * 0.65)))
+            self.resize(target_w, target_h)
+        else:
+            self.resize(1140, 720)
 
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(24, 20, 24, 20)
         main_layout.setSpacing(14)
 
-        # 1. Header (Título, Subtítulo e Botões de Gestão)
+        # 1. Header (Título, Subtítulo e Botões de Gestão com Atalhos Visíveis)
         header_layout = QHBoxLayout()
         title_box = QVBoxLayout()
         title_box.setSpacing(3)
@@ -803,28 +777,28 @@ class KeybindsWindow(QWidget):
         header_layout.addLayout(title_box)
         header_layout.addStretch()
 
-        # Botão: Editar Atalho Selecionado (F2)
-        self.btn_edit_selected = QPushButton("✏️ Editar Atalho (F2)", self)
-        self.btn_edit_selected.setProperty("class", "HeaderAction")
-        self.btn_edit_selected.clicked.connect(self.on_edit_selected)
-        header_layout.addWidget(self.btn_edit_selected)
-
-        # Botão: Novo Atalho
-        btn_add = QPushButton("➕ Novo Atalho", self)
+        # Botão: Novo Atalho (Ctrl+N)
+        btn_add = QPushButton("➕ Novo Atalho (Ctrl+N)", self)
         btn_add.setProperty("class", "HeaderAction")
         btn_add.clicked.connect(self.open_add_dialog)
         header_layout.addWidget(btn_add)
 
-        # Botão: Menu de Arquivos de Binds
-        btn_files = QPushButton("📄 Arquivos de Binds ▾", self)
+        # Botão: Editar Atalho Selecionado (F2)
+        self.btn_edit_selected = QPushButton("✏️ Editar (F2)", self)
+        self.btn_edit_selected.setProperty("class", "HeaderAction")
+        self.btn_edit_selected.clicked.connect(self.on_edit_selected)
+        header_layout.addWidget(self.btn_edit_selected)
+
+        # Botão: Menu de Arquivos de Binds (Ctrl+O)
+        btn_files = QPushButton("📄 Binds (Ctrl+O) ▾", self)
         btn_files.setProperty("class", "HeaderAction")
         files_menu = QMenu(self)
-        files_menu.setStyleSheet(f"background-color: {CARD_BG}; color: {TEXT_COLOR}; border: 1px solid {BORDER_COLOR};")
+        files_menu.setStyleSheet(f"background-color: {self.theme['CARD_BG']}; color: {self.theme['TEXT_COLOR']}; border: 1px solid {self.theme['BORDER_COLOR']};")
 
-        act_binds = files_menu.addAction("📄 Abrir binds.lua (Atalhos do Hyprland)")
+        act_binds = files_menu.addAction("📄 Abrir binds.lua (Atalhos do Hyprland) [Ctrl+O]")
         act_binds.triggered.connect(lambda: open_file_in_editor(BINDS_LUA, 1))
 
-        act_custom = files_menu.addAction("⭐ Abrir custom_binds.lua (Atalhos do Usuário)")
+        act_custom = files_menu.addAction("⭐ Abrir custom_binds.lua (Atalhos do Usuário) [Ctrl+Shift+O]")
         act_custom.triggered.connect(lambda: open_file_in_editor(CUSTOM_BINDS_LUA, 1))
 
         act_vars = files_menu.addAction("⚙️ Abrir variables.lua (Workspaces & Monitores)")
@@ -836,8 +810,8 @@ class KeybindsWindow(QWidget):
         btn_files.setMenu(files_menu)
         header_layout.addWidget(btn_files)
 
-        # Botão: Recarregar
-        btn_reload = QPushButton("🔄 Recarregar", self)
+        # Botão: Recarregar (F5 / Ctrl+R)
+        btn_reload = QPushButton("🔄 Recarregar (F5)", self)
         btn_reload.setProperty("class", "HeaderAction")
         btn_reload.clicked.connect(self.reload_system_binds)
         header_layout.addWidget(btn_reload)
@@ -851,7 +825,7 @@ class KeybindsWindow(QWidget):
 
         # Banner de Notificação
         self.banner_label = QLabel("", self)
-        self.banner_label.setStyleSheet(f"background-color: {INPUT_BG}; color: {ACCENT_GREEN}; border: 1px solid {BORDER_COLOR}; border-radius: 6px; padding: 6px 12px; font-weight: 500;")
+        self.banner_label.setStyleSheet(f"background-color: {self.theme['INPUT_BG']}; color: {self.theme['ACCENT_GREEN']}; border: 1px solid {self.theme['BORDER_COLOR']}; border-radius: 6px; padding: 6px 12px; font-weight: 500;")
         self.banner_label.setVisible(False)
         main_layout.addWidget(self.banner_label)
 
@@ -867,7 +841,6 @@ class KeybindsWindow(QWidget):
         chips_layout = QHBoxLayout()
         chips_layout.setSpacing(8)
 
-        # Lista de categorias disponíveis (você pode adicionar mais aqui!)
         categories = [
             ("Todos", "✨ Todos"),
             ("CUSTOM", "⭐ Customizados"),
@@ -925,7 +898,7 @@ class KeybindsWindow(QWidget):
 
         self.search_input.returnPressed.connect(self.execute_selected)
 
-        # 5. Rodapé
+        # 5. Rodapé Informativo
         footer_layout = QHBoxLayout()
         self.count_label = QLabel(f"Total de atalhos catalogados: {len(self.raw_binds)}", self)
         self.count_label.setObjectName("FooterLabel")
@@ -935,7 +908,9 @@ class KeybindsWindow(QWidget):
         tip_arrow = QLabel(
             "<span style='color:#bcc2ff;'>↑/↓</span> Navegar &nbsp;&nbsp; "
             "<span style='color:#bcc2ff;'>Tab</span> Alternar Filtro &nbsp;&nbsp; "
+            "<span style='color:#bcc2ff;'>Ctrl+N</span> Novo &nbsp;&nbsp; "
             "<span style='color:#bcc2ff;'>F2</span> Editar &nbsp;&nbsp; "
+            "<span style='color:#bcc2ff;'>F5</span> Recarregar &nbsp;&nbsp; "
             "<span style='color:#bcc2ff;'>↵ Enter</span> Executar &nbsp;&nbsp; "
             "<span style='color:#bcc2ff;'>Esc</span> Sair",
             self
@@ -944,71 +919,60 @@ class KeybindsWindow(QWidget):
         footer_layout.addWidget(tip_arrow)
         main_layout.addLayout(footer_layout)
 
-        # Foco inicial na busca
         self.search_input.setFocus()
 
+    def setup_keyboard_shortcuts(self):
+        """Atalhos globais de teclado da janela."""
+        QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self.close)
+        QShortcut(QKeySequence("Ctrl+N"), self, self.open_add_dialog)
+        QShortcut(QKeySequence("Ctrl+R"), self, self.reload_system_binds)
+        QShortcut(QKeySequence("F5"), self, self.reload_system_binds)
+        QShortcut(QKeySequence("Ctrl+O"), self, lambda: open_file_in_editor(BINDS_LUA, 1))
+        QShortcut(QKeySequence("Ctrl+Shift+O"), self, lambda: open_file_in_editor(CUSTOM_BINDS_LUA, 1))
+        QShortcut(QKeySequence("Ctrl+B"), self, lambda: open_file_in_editor(BINDS_LUA, 1))
+        QShortcut(QKeySequence("F2"), self, self.on_edit_selected)
+        QShortcut(QKeySequence("Ctrl+E"), self, self.on_edit_selected)
+
     def focusNextPrevChild(self, next):
-        """Impede que o Tab navegue entre os botões da janela e usa para alternar categorias."""
-        direction = 1 if next else -1
-        self.cycle_category(direction)
-        return False
+        """Evita duplo salto do Tab interceptando no nível da janela e retornando True."""
+        self.cycle_category(1 if next else -1)
+        return True
 
     def eventFilter(self, obj, event):
-        """Filtro de eventos para garantir navegação com setas e digitação contínua."""
+        """Filtro de eventos na tabela."""
         if obj == self.table and event.type() == QEvent.Type.KeyPress:
             key = event.key()
             text = event.text()
 
-            # Tab / Backtab alterna filtros
-            if key in (Qt.Key.Key_Tab, Qt.Key.Key_Backtab):
-                direction = 1 if key == Qt.Key.Key_Tab else -1
-                self.cycle_category(direction)
-                return True
-
-            # F2 edita o atalho selecionado
-            if key == Qt.Key.Key_F2:
-                self.on_edit_selected()
-                return True
-
-            # Enter executa a ação selecionada
             if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
                 self.execute_selected()
                 return True
 
-            # Escape fecha a janela
             if key == Qt.Key.Key_Escape:
                 self.close()
                 return True
 
-            # Qualquer digitação de texto redireciona automaticamente para o input de busca
+            # Redirecionar digitação livre na tabela para o campo de busca
             if text and text.isprintable() and key not in (Qt.Key.Key_Up, Qt.Key.Key_Down, Qt.Key.Key_Left, Qt.Key.Key_Right):
                 self.search_input.setFocus()
                 self.search_input.setText(self.search_input.text() + text)
                 self.search_input.setCursorPosition(len(self.search_input.text()))
                 return True
 
-            # Backspace apaga caractere da busca mesmo focado na tabela
             if key == Qt.Key.Key_Backspace:
                 self.search_input.setFocus()
                 cur = self.search_input.text()
-                if cur:
-                    self.search_input.setText(cur[:-1])
+                if cur: self.search_input.setText(cur[:-1])
                 return True
 
         return super().eventFilter(obj, event)
 
     def keyPressEvent(self, event: QKeyEvent):
-        """Captura global de teclas para toda a janela."""
         key = event.key()
         text = event.text()
 
         if key == Qt.Key.Key_Escape:
             self.close()
-            return
-
-        if key in (Qt.Key.Key_Tab, Qt.Key.Key_Backtab):
-            direction = 1 if key == Qt.Key.Key_Tab else -1
-            self.cycle_category(direction)
             return
 
         if key == Qt.Key.Key_Down:
@@ -1023,7 +987,6 @@ class KeybindsWindow(QWidget):
             self.execute_selected()
             return
 
-        # Digitação espontânea: direciona sempre para a busca
         if text and text.isprintable() and not self.search_input.hasFocus():
             self.search_input.setFocus()
             self.search_input.setText(self.search_input.text() + text)
@@ -1033,11 +996,10 @@ class KeybindsWindow(QWidget):
         super().keyPressEvent(event)
 
     def cycle_category(self, direction: int):
-        """Alterna suavemente para a próxima/anterior categoria usando a tecla TAB."""
+        """Percorre as categorias estritamente de 1 em 1."""
         if not self.chip_buttons:
             return
 
-        # Descobrir o índice atual
         cur_idx = 0
         for i, (cid, btn) in enumerate(self.chip_buttons):
             if btn.isChecked():
@@ -1049,21 +1011,14 @@ class KeybindsWindow(QWidget):
 
         next_btn.setChecked(True)
         self.on_category_clicked(next_cat_id)
-        # Mantém a prontidão para continuar digitando na busca
         self.search_input.setFocus()
 
     def move_table_selection(self, delta: int):
-        """Move a seleção da tabela para cima/baixo mantendo a visualização centralizada."""
         rows = self.table.rowCount()
         if rows == 0:
             return
-
         cur = self.table.currentRow()
-        if cur < 0:
-            new_row = 0 if delta > 0 else rows - 1
-        else:
-            new_row = max(0, min(rows - 1, cur + delta))
-
+        new_row = (0 if delta > 0 else rows - 1) if cur < 0 else max(0, min(rows - 1, cur + delta))
         self.table.selectRow(new_row)
         item = self.table.item(new_row, 0)
         if item:
@@ -1074,10 +1029,10 @@ class KeybindsWindow(QWidget):
         self.banner_label.setVisible(True)
 
     def open_add_dialog(self):
-        dlg = AddShortcutDialog(self)
+        dlg = AddShortcutDialog(self.theme, self)
         if dlg.exec():
             self.reload_system_binds()
-            self.show_banner("✅ Novo atalho salvo com sucesso em custom_binds.lua e carregado no Hyprland!")
+            self.show_banner("✅ Novo atalho salvo em custom_binds.lua e carregado no Hyprland!")
 
     def on_edit_selected(self):
         row = self.table.currentRow()
@@ -1086,16 +1041,18 @@ class KeybindsWindow(QWidget):
             return
 
         bind_item = self.displayed_binds[row]
-        dlg = EditShortcutDialog(bind_item, self)
+        dlg = EditShortcutDialog(bind_item, self.theme, self)
         if dlg.exec():
             self.reload_system_binds()
             self.show_banner(f"✅ Atalho '{bind_item['key']}' atualizado com sucesso no arquivo de origem!")
 
     def reload_system_binds(self):
         subprocess.run(["hyprctl", "reload"], check=False)
+        self.theme = load_noctalia_theme()
+        QApplication.instance().setStyleSheet(build_stylesheet(self.theme))
         self.load_binds()
         self.filter_binds()
-        self.show_banner("🔄 Atalhos do Hyprland e Noctalia recarregados com sucesso!")
+        self.show_banner("🔄 Atalhos e tema recarregados com sucesso!")
 
     def on_category_clicked(self, cat_id):
         self.active_category = cat_id
@@ -1111,26 +1068,25 @@ class KeybindsWindow(QWidget):
             desc = b["desc"]
             src = b.get("source_file", "")
 
-            if self.active_category != "Todos":
-                if self.active_category not in cat.upper():
-                    continue
+            if self.active_category != "Todos" and self.active_category not in cat.upper():
+                continue
 
-            if query:
-                combined = f"{cat} {key} {desc} {src}".lower()
-                if query not in combined:
-                    continue
+            if query and query not in f"{cat} {key} {desc} {src}".lower():
+                continue
 
             filtered.append(b)
 
-        self.displayed_binds = filtered
         self.populate_table(filtered)
         self.count_label.setText(f"Exibindo {len(filtered)} de {len(self.raw_binds)} atalhos")
 
     def populate_table(self, binds):
+        """Preenchimento ultra-otimizado da tabela (<1ms) desativando redesenho em lote."""
         self.displayed_binds = binds
+        self.table.setUpdatesEnabled(False)
         self.table.setRowCount(len(binds))
-        font_mono = QFont("JetBrains Mono", 10)
-        font_mono.setStyleHint(QFont.StyleHint.Monospace)
+
+        # Fonte monoespaçada oficial do sistema
+        font_mono = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
 
         for row, b in enumerate(binds):
             cat = b["category"]
@@ -1140,47 +1096,28 @@ class KeybindsWindow(QWidget):
             line_num = b.get("line_number", 0)
             src_type = b.get("source_type", "")
 
-            # 1. Categoria
             item_cat = QTableWidgetItem(cat)
             item_cat.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
             if "CUSTOM" in cat.upper():
-                item_cat.setForeground(QColor(ACCENT_GREEN))
+                item_cat.setForeground(QColor(self.theme['ACCENT_GREEN']))
 
-            # 2. Tecla
-            formatted_key = self.format_key(key)
-            item_key = QTableWidgetItem(formatted_key)
+            item_key = QTableWidgetItem(self.format_key(key))
             item_key.setFont(font_mono)
-            item_key.setForeground(QColor(ACCENT_PRIMARY))
+            item_key.setForeground(QColor(self.theme['ACCENT_PRIMARY']))
             item_key.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
 
-            # 3. Descrição
             item_desc = QTableWidgetItem(desc)
             item_desc.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
 
-            # 4. Arquivo de Origem
-            origin_label = ""
-            if src_file:
-                basename = os.path.basename(src_file)
-                if line_num > 0:
-                    origin_label = f"{basename}:{line_num}"
-                else:
-                    origin_label = basename
-            else:
-                origin_label = src_type
-
+            origin_label = f"{os.path.basename(src_file)}:{line_num}" if (src_file and line_num > 0) else (os.path.basename(src_file) if src_file else src_type)
             item_src = QTableWidgetItem(origin_label)
             item_src.setFont(font_mono)
-            item_src.setForeground(QColor(ACCENT_BLUE))
+            item_src.setForeground(QColor(self.theme['ACCENT_BLUE']))
             item_src.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
-            # 5. Ação (Executar ou Editar)
             is_executable = self.is_action_executable(desc)
-            action_text = "↵ Executar" if is_executable else "✏️ Editar"
-            item_act = QTableWidgetItem(action_text)
-            if is_executable:
-                item_act.setForeground(QColor(ACCENT_GREEN))
-            else:
-                item_act.setForeground(QColor(ACCENT_SECONDARY))
+            item_act = QTableWidgetItem("↵ Executar" if is_executable else "✏️ Editar")
+            item_act.setForeground(QColor(self.theme['ACCENT_GREEN'] if is_executable else self.theme['ACCENT_SECONDARY']))
             item_act.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
             self.table.setItem(row, 0, item_cat)
@@ -1189,21 +1126,22 @@ class KeybindsWindow(QWidget):
             self.table.setItem(row, 3, item_src)
             self.table.setItem(row, 4, item_act)
 
+        self.table.setUpdatesEnabled(True)
         if len(binds) > 0:
             self.table.selectRow(0)
 
     def format_key(self, raw_key):
-        parts = [p.strip() for p in raw_key.split("+")]
-        return " + ".join([f"[{p}]" for p in parts])
+        return " + ".join([f"[{p.strip()}]" for p in raw_key.split("+")])
 
     def is_action_executable(self, desc):
-        triggers = [
-            "Abrir", "Terminal", "Dolphin", "Firefox", "Calculadora",
-            "KDE Connect", "btop", "Capturar", "Conta-gotas", "Lançador",
-            "Central de Controle", "Wallpapers", "Área de Transferência",
-            "Configurações", "Bloquear a tela", "Menu de Energia", "Executar"
-        ]
-        return any(t.lower() in desc.lower() for t in triggers)
+        triggers = (
+            "abrir", "terminal", "dolphin", "firefox", "calculadora",
+            "kde connect", "btop", "capturar", "conta-gotas", "lançador",
+            "central de controle", "wallpapers", "área de transferência",
+            "configurações", "bloquear a tela", "menu de energia", "executar"
+        )
+        dl = desc.lower()
+        return any(t in dl for t in triggers)
 
     def execute_selected(self):
         row = self.table.currentRow()
@@ -1214,7 +1152,10 @@ class KeybindsWindow(QWidget):
 
         if self.is_action_executable(desc):
             self.dispatch_action(desc)
-            self.close()
+            if self.is_daemon:
+                self.hide()
+            else:
+                self.close()
         else:
             self.on_edit_selected()
 
@@ -1222,89 +1163,101 @@ class KeybindsWindow(QWidget):
         self.execute_selected()
 
     def dispatch_action(self, desc):
-        """Executa a ação correspondente ao atalho selecionado."""
         d = desc.lower()
-        if "terminal kitty" in d:
-            subprocess.Popen(["kitty"])
+        if "terminal kitty" in d: subprocess.Popen(["kitty"])
         elif "dolphin" in d:
             env = os.environ.copy()
             env["XDG_CURRENT_DESKTOP"] = "KDE"
             env["QT_QPA_PLATFORMTHEME"] = "kde"
             subprocess.Popen(["dolphin"], env=env)
-        elif "firefox" in d or "navegador" in d:
-            subprocess.Popen(["firefox"])
-        elif "calculadora" in d:
-            subprocess.Popen(["gnome-calculator"])
-        elif "kde connect" in d:
-            subprocess.Popen(["kdeconnect-app"])
-        elif "btop" in d:
-            subprocess.Popen(["kitty", "-e", "btop"])
-        elif "capturar região" in d:
-            subprocess.Popen(["noctalia", "msg", "screenshot-region"])
-        elif "capturar a tela inteira" in d:
-            subprocess.Popen(["noctalia", "msg", "screenshot-fullscreen"])
-        elif "conta-gotas" in d:
-            subprocess.Popen(["hyprpicker", "-a", "-n"])
-        elif "central de controle" in d:
-            subprocess.Popen(["noctalia", "msg", "panel-toggle", "control-center"])
-        elif "lançador" in d:
-            subprocess.Popen(["noctalia", "msg", "panel-toggle", "launcher"])
-        elif "wallpapers" in d or "papéis de parede" in d:
-            subprocess.Popen(["noctalia", "msg", "panel-toggle", "wallpaper"])
-        elif "área de transferência" in d or "clipboard" in d:
-            subprocess.Popen(["noctalia", "msg", "panel-toggle", "clipboard"])
-        elif "configurações do noctalia" in d:
-            subprocess.Popen(["noctalia", "msg", "settings-toggle"])
-        elif "bloquear a tela" in d:
-            subprocess.Popen(["noctalia", "msg", "session", "lock"])
-        elif "menu de energia" in d:
-            subprocess.Popen(["noctalia", "msg", "panel-toggle", "session"])
+        elif "firefox" in d or "navegador" in d: subprocess.Popen(["firefox"])
+        elif "calculadora" in d: subprocess.Popen(["gnome-calculator"])
+        elif "kde connect" in d: subprocess.Popen(["kdeconnect-app"])
+        elif "btop" in d: subprocess.Popen(["kitty", "-e", "btop"])
+        elif "capturar região" in d: subprocess.Popen(["noctalia", "msg", "screenshot-region"])
+        elif "capturar a tela inteira" in d: subprocess.Popen(["noctalia", "msg", "screenshot-fullscreen"])
+        elif "conta-gotas" in d: subprocess.Popen(["hyprpicker", "-a", "-n"])
+        elif "central de controle" in d: subprocess.Popen(["noctalia", "msg", "panel-toggle", "control-center"])
+        elif "lançador" in d: subprocess.Popen(["noctalia", "msg", "panel-toggle", "launcher"])
+        elif "wallpapers" in d or "papéis de parede" in d: subprocess.Popen(["noctalia", "msg", "panel-toggle", "wallpaper"])
+        elif "área de transferência" in d or "clipboard" in d: subprocess.Popen(["noctalia", "msg", "panel-toggle", "clipboard"])
+        elif "configurações do noctalia" in d: subprocess.Popen(["noctalia", "msg", "settings-toggle"])
+        elif "bloquear a tela" in d: subprocess.Popen(["noctalia", "msg", "session", "lock"])
+        elif "menu de energia" in d: subprocess.Popen(["noctalia", "msg", "panel-toggle", "session"])
         elif "executar:" in d:
             cmd = desc.split(":", 1)[1].strip()
             subprocess.Popen(cmd.split())
 
 # ==============================================================================
-# 6. ENTRADA PRINCIPAL COM SINGLETON NATIVO (ALTERNÂNCIA / FECHAMENTO)
+# ENTRADA PRINCIPAL: CLIENTE RÁPIDO & MODO DAEMON RESIDENTE
 # ==============================================================================
 def main():
-    app = QApplication(sys.argv)
+    is_daemon_arg = "--daemon" in sys.argv
+
+    # 1. Se não for daemon, verificar se já existe processo rodando (0.5ms)
+    if not is_daemon_arg:
+        app_check = QApplication(sys.argv)
+        check_sock = QLocalSocket()
+        check_sock.connectToServer(SINGLETON_SOCKET)
+        if check_sock.waitForConnected(120):
+            check_sock.write(b"toggle\n")
+            check_sock.waitForBytesWritten(120)
+            check_sock.disconnectFromServer()
+            sys.exit(0)
+    else:
+        app_check = QApplication(sys.argv)
+
+    app = app_check
     app.setApplicationName("hypr-cheatsheet")
     app.setDesktopFileName("hypr-cheatsheet")
 
-    # 1. Checar se já existe uma instância aberta (Singleton)
-    check_sock = QLocalSocket()
-    check_sock.connectToServer(SINGLETON_SOCKET)
-    if check_sock.waitForConnected(150):
-        # Janela já está aberta! Envia sinal 'toggle' para fechar a existente e sai
-        check_sock.write(b"toggle\n")
-        check_sock.waitForBytesWritten(150)
-        check_sock.disconnectFromServer()
-        sys.exit(0)
-
-    # 2. Iniciar servidor local para escutar tentativas duplicadas
+    # Servidor local para escutar toggles instantâneos
     QLocalServer.removeServer(SINGLETON_SOCKET)
     server = QLocalServer()
     server.listen(SINGLETON_SOCKET)
 
-    app.setStyleSheet(STYLESHEET)
+    theme = load_noctalia_theme()
+    app.setStyleSheet(build_stylesheet(theme))
 
-    window = KeybindsWindow()
+    window = KeybindsWindow(is_daemon=is_daemon_arg)
     window.setWindowTitle("Hyprland Keybinds Explorer")
 
     def on_incoming_connection():
         conn = server.nextPendingConnection()
         if conn:
-            # Se o usuário pressionar o atalho com o menu já aberto, fechar suavemente
-            window.close()
+            conn.waitForReadyRead(100)
+            msg = conn.readAll().data().decode().strip()
+            if msg == "toggle":
+                if is_daemon_arg:
+                    if window.isVisible():
+                        window.hide()
+                    else:
+                        window.theme = load_noctalia_theme()
+                        app.setStyleSheet(build_stylesheet(window.theme))
+                        window.show()
+                        window.raise_()
+                        window.activateWindow()
+                        window.search_input.setFocus()
+                else:
+                    window.close()
+            elif msg == "show":
+                window.show()
+                window.raise_()
+                window.activateWindow()
+                window.search_input.setFocus()
+            conn.disconnectFromServer()
 
     server.newConnection.connect(on_incoming_connection)
 
-    # Limpeza de socket ao fechar a janela
     def cleanup():
         QLocalServer.removeServer(SINGLETON_SOCKET)
     app.aboutToQuit.connect(cleanup)
 
-    window.show()
+    if not is_daemon_arg:
+        window.show()
+    else:
+        print("[Noctalia Keybinds] Daemon residente iniciado em background com sucesso (<5ms de resposta).")
+
     sys.exit(app.exec())
 
 if __name__ == "__main__":

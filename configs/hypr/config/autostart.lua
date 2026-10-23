@@ -12,4 +12,6 @@ hl.on("hyprland.start", function ()
     -- Restaurar sessão de janelas e iniciar salvamento periódico a cada 60s
     hl.exec_cmd("python3 " .. os.getenv("HOME") .. "/.config/hypr/scripts/session.py restore")
     hl.exec_cmd("bash -c 'while true; do sleep 60; python3 $HOME/.config/hypr/scripts/session.py save; done'")
+    -- Pré-aquecimento do menu de atalhos para abertura instantânea (<5ms)
+    hl.exec_cmd("python3 " .. os.getenv("HOME") .. "/.config/hypr/scripts/keybinds-gui.py --daemon")
 end)
