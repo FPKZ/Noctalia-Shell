@@ -5,11 +5,9 @@ auto_hide_delay_ms = 500
 background_opacity = 0.78999998234212399
 center = [ "workspaces" ]
 end = [ "media", "spacer_1", "tray", "notifications", "network", "volume", "spacer_1", "session" ]
-margin_ends = 8
 margin_opposite_edge = 1
 scale = 1.0000000074505806
 start = [ "launcher", "spacer_1", "clock", "group:g1", "spacer_1", "active_window" ]
-thickness = 26
 
     [[bar.default.capsule_group]]
     accordion = false

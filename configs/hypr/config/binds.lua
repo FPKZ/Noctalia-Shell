@@ -178,3 +178,4 @@ hl.bind(mainMod .. " + I",         hl.dsp.workspace.toggle_special())
 local keybindsScript = os.getenv("HOME") .. "/.config/hypr/scripts/keybinds.sh"
 hl.bind(mainMod .. " + F1", hl.dsp.exec_cmd(keybindsScript))
 hl.bind(mainMod .. " + slash", hl.dsp.exec_cmd(keybindsScript))
+hl.bind(mainMod .. " + SHIFT + F1", hl.dsp.exec_cmd(keybindsScript .. " --floating"))

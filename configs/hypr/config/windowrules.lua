@@ -126,3 +126,6 @@ hl.layer_rule({
   blur = true,
   blur_popups = true,
 })
+
+-- Cheatsheet / Menu de Atalhos Flutuante
+hl.window_rule({ match = { class = "^(hypr-cheatsheet)$" }, float = true, center = true, pin = true })
