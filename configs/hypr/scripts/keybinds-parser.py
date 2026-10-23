@@ -1,32 +1,53 @@
 #!/usr/bin/env python3
 # ==============================================================================
 # keybinds-parser.py
-# Analisador Universal de Atalhos do Sistema
-# Lê dinamicamente:
-#  1. Hyprland (binds.lua)
-#  2. Noctalia Shell (ações e comandos de interface)
-#  3. Terminal Kitty (janelas, abas, split e histórico)
-#  4. Dolphin (gerenciador de arquivos)
-#  5. Navegador Web (Firefox / Chrome)
-#  6. KDE Plasma / KWin (kglobalshortcutsrc) se presente
+# Analisador Universal e Gerenciador de Atalhos do Sistema
+# Lê e rastreia dinamicamente:
+#  1. Hyprland (binds.lua) com número de linha exato
+#  2. Atalhos customizados (custom_binds.lua) com número de linha exato
+#  3. Terminal Kitty (kitty.conf)
+#  4. Dolphin & KDE Plasma (kglobalshortcutsrc)
+#  5. Navegador Web
 # ==============================================================================
 import os
 import re
 import sys
 import unicodedata
 import configparser
+import subprocess
 
 CONFIG_DIR = os.path.expanduser("~/.config")
 HYPR_DIR = os.path.join(CONFIG_DIR, "hypr")
 BINDS_LUA = os.path.join(HYPR_DIR, "config/binds.lua")
 CUSTOM_BINDS_LUA = os.path.join(HYPR_DIR, "config/custom_binds.lua")
+VARIABLES_LUA = os.path.join(HYPR_DIR, "config/variables.lua")
 KGLOBAL_SRC = os.path.join(CONFIG_DIR, "kglobalshortcutsrc")
+KITTY_CONF = os.path.join(CONFIG_DIR, "kitty/kitty.conf")
+
+class BindItem(dict):
+    """Representa um atalho com metadados de origem e suporte a desempacotamento."""
+    def __init__(self, category, key, desc, source_type="system", source_file="", line_number=0, raw_key="", raw_action=""):
+        super().__init__(
+            category=category,
+            key=key,
+            desc=desc,
+            source_type=source_type,
+            source_file=source_file,
+            line_number=line_number,
+            raw_key=raw_key,
+            raw_action=raw_action
+        )
+
+    def __iter__(self):
+        yield self["category"]
+        yield self["key"]
+        yield self["desc"]
 
 def get_display_width(s: str) -> int:
     """Calcula a largura real de exibição em células de terminal monospace."""
     w = 0
     for ch in s:
-        if ch in ('\ufe0f', '\ufe0e'):  # Variation Selectors
+        if ch in ('\ufe0f', '\ufe0e'):
             continue
         eaw = unicodedata.east_asian_width(ch)
         if eaw in ('W', 'F'):
@@ -64,6 +85,7 @@ ACTION_MAP = {
     "window.drag": ("🖱️ [HYPR: MOUSE]", "Mover janela arrastando com botão esquerdo"),
     "window.resize()": ("🖱️ [HYPR: MOUSE]", "Redimensionar janela arrastando com botão direito"),
     "window.resize": ("🪟 [HYPR: JANELA]", "Redimensionar janela ativa via teclado"),
+
     # Zoom
     "zoomfunction(-": ("🔍 [HYPR: ZOOM]", "Diminuir zoom geral da tela (Zoom Out)"),
     "zoomfunction(": ("🔍 [HYPR: ZOOM]", "Aumentar zoom geral da tela (Zoom In)"),
@@ -132,6 +154,34 @@ def clean_key_name(k):
     k = k.replace('SHIFT', 'Shift').replace('CONTROL', 'Ctrl').replace('ALT', 'Alt')
     return k
 
+def readable_key_to_lua(readable_key):
+    """Converte formato legível (ex: Super + Shift + Q) para código Lua do binds.lua."""
+    parts = [p.strip() for p in readable_key.split("+")]
+    lua_parts = []
+    for p in parts:
+        pl = p.lower()
+        if pl == "super":
+            lua_parts.append("mainMod")
+        elif pl in ("ctrl", "control"):
+            lua_parts.append('"CONTROL"')
+        elif pl == "shift":
+            lua_parts.append('"SHIFT"')
+        elif pl == "alt":
+            lua_parts.append('"ALT"')
+        elif pl == "enter":
+            lua_parts.append('"Return"')
+        elif pl == "esc":
+            lua_parts.append('"Escape"')
+        else:
+            lua_parts.append(f'"{p}"')
+
+    if lua_parts[0] == "mainMod":
+        rest = " + ".join([p.strip('"') for p in lua_parts[1:]])
+        return f'mainMod .. " + {rest}"'
+    else:
+        full = " + ".join([p.strip('"') for p in lua_parts])
+        return f'"{full}"'
+
 def extract_hypr_binds():
     items = []
     seen = set()
@@ -143,7 +193,7 @@ def extract_hypr_binds():
         lines = f.readlines()
 
     last_comment = ""
-    for line in lines:
+    for line_num, line in enumerate(lines, start=1):
         stripped = line.strip()
         if stripped.startswith("--") and not stripped.startswith("----") and not stripped.startswith("-- >>"):
             last_comment = stripped.lstrip("-").strip()
@@ -188,20 +238,29 @@ def extract_hypr_binds():
                     else:
                         desc = raw_action.replace("hl.dsp.", "").strip()
 
-            items.append((category, key, desc))
+            items.append(BindItem(
+                category=category,
+                key=key,
+                desc=desc,
+                source_type="hyprland",
+                source_file=BINDS_LUA,
+                line_number=line_num,
+                raw_key=raw_key,
+                raw_action=raw_action
+            ))
             last_comment = ""
         else:
             if not stripped.startswith("--"):
                 last_comment = ""
 
-    # Workspaces numéricos
-    items.append(("🗂️ [HYPR: WORKSPACE]", "Super + Ctrl + 1..10", "Alternar para workspace 1 a 10 no monitor focado"))
-    items.append(("🗂️ [HYPR: WORKSPACE]", "Super + Ctrl + Down", "Criar / Pular para o próximo workspace vazio"))
-    items.append(("🗂️ [HYPR: WORKSPACE]", "Super + Ctrl + Left / Right", "Navegar para workspace anterior ou próximo"))
-    items.append(("🗂️ [HYPR: WORKSPACE]", "Super + Scroll", "Rolar entre workspaces do monitor"))
-    items.append(("🗂️ [HYPR: WORKSPACE]", "Super + Shift + Ctrl + 1..10", "Mover janela ativa para workspace 1 a 10"))
-    items.append(("🖥️ [HYPR: MONITOR]", "Super + 1 / 2", "Focar no Monitor 1 (HDMI) ou Monitor 2 (DP)"))
-    items.append(("🖥️ [HYPR: MONITOR]", "Super + Shift + 1 / 2", "Mover janela para Monitor 1 ou Monitor 2"))
+    # Workspaces numéricos dinâmicos
+    items.append(BindItem("🗂️ [HYPR: WORKSPACE]", "Super + Ctrl + 1..10", "Alternar para workspace 1 a 10 no monitor focado", source_type="hyprland_loop", source_file=VARIABLES_LUA, line_number=16, raw_key="Super + Ctrl + 1..10", raw_action="NUM_WPM = 10"))
+    items.append(BindItem("🗂️ [HYPR: WORKSPACE]", "Super + Ctrl + Down", "Criar / Pular para o próximo workspace vazio", source_type="hyprland", source_file=BINDS_LUA, line_number=165, raw_key='mainMod .. " + CONTROL + Down"', raw_action='hl.dsp.focus({ workspace = "emptym" })'))
+    items.append(BindItem("🗂️ [HYPR: WORKSPACE]", "Super + Ctrl + Left / Right", "Navegar para workspace anterior ou próximo", source_type="hyprland", source_file=BINDS_LUA, line_number=163, raw_key='mainMod .. " + CONTROL + Left/Right"', raw_action='hl.dsp.focus({ workspace = "m+/-1" })'))
+    items.append(BindItem("🗂️ [HYPR: WORKSPACE]", "Super + Scroll", "Rolar entre workspaces do monitor", source_type="hyprland", source_file=BINDS_LUA, line_number=168, raw_key='mainMod .. " + mouse_up/down"', raw_action='hl.dsp.focus({ workspace = "m+/-1" })'))
+    items.append(BindItem("🗂️ [HYPR: WORKSPACE]", "Super + Shift + Ctrl + 1..10", "Mover janela ativa para workspace 1 a 10", source_type="hyprland_loop", source_file=VARIABLES_LUA, line_number=16, raw_key="Super + Shift + Ctrl + 1..10", raw_action="NUM_WPM = 10"))
+    items.append(BindItem("🖥️ [HYPR: MONITOR]", "Super + 1 / 2", "Focar no Monitor 1 (HDMI) ou Monitor 2 (DP)", source_type="hyprland", source_file=BINDS_LUA, line_number=146, raw_key='mainMod .. " + 1/2"', raw_action='hl.dsp.focus({ monitor = ... })'))
+    items.append(BindItem("🖥️ [HYPR: MONITOR]", "Super + Shift + 1 / 2", "Mover janela para Monitor 1 ou Monitor 2", source_type="hyprland", source_file=BINDS_LUA, line_number=37, raw_key='mainMod .. " + SHIFT + 1/2"', raw_action='hl.dsp.window.move({ monitor = ... })'))
 
     return items
 
@@ -215,7 +274,7 @@ def extract_custom_binds():
 
     last_comment = ""
     custom_cat = "⭐ [CUSTOM]"
-    for line in lines:
+    for line_num, line in enumerate(lines, start=1):
         stripped = line.strip()
         if stripped.startswith("--") and not stripped.startswith("----") and not stripped.startswith("-- ="):
             c_text = stripped.lstrip("-").strip()
@@ -243,7 +302,16 @@ def extract_custom_binds():
                 else:
                     desc = raw_action.replace("hl.dsp.", "").strip()
 
-            items.append((custom_cat, key, desc))
+            items.append(BindItem(
+                category=custom_cat,
+                key=key,
+                desc=desc,
+                source_type="custom",
+                source_file=CUSTOM_BINDS_LUA,
+                line_number=line_num,
+                raw_key=raw_key,
+                raw_action=raw_action
+            ))
             last_comment = ""
             custom_cat = "⭐ [CUSTOM]"
         else:
@@ -253,40 +321,80 @@ def extract_custom_binds():
     return items
 
 def get_terminal_kitty_binds():
-    return [
-        ("💻 [KITTY: TERMINAL]", "Ctrl + Shift + Enter", "Nova janela de terminal lado a lado (Split)"),
-        ("💻 [KITTY: TERMINAL]", "Ctrl + Shift + T", "Nova aba de terminal"),
-        ("💻 [KITTY: TERMINAL]", "Ctrl + Shift + W", "Fechar janela / aba atual do terminal"),
-        ("💻 [KITTY: TERMINAL]", "Ctrl + Shift + ] / [", "Navegar para a próxima / anterior janela"),
-        ("💻 [KITTY: TERMINAL]", "Ctrl + Shift + Right / Left", "Navegar para a próxima / anterior aba"),
-        ("💻 [KITTY: TERMINAL]", "Ctrl + Shift + C / V", "Copiar / Colar texto no terminal"),
-        ("💻 [KITTY: TERMINAL]", "Ctrl + Shift + + / -", "Aumentar / Diminuir tamanho da fonte"),
-        ("💻 [KITTY: TERMINAL]", "Ctrl + Shift + Backspace", "Restaurar tamanho padrão da fonte"),
-        ("💻 [KITTY: TERMINAL]", "Ctrl + Shift + F", "Pesquisar texto no histórico do terminal"),
+    items = [
+        ("💻 [KITTY: TERMINAL]", "Ctrl + Shift + Enter", "Nova janela de terminal lado a lado (Split)", "new_window"),
+        ("💻 [KITTY: TERMINAL]", "Ctrl + Shift + T", "Nova aba de terminal", "new_tab"),
+        ("💻 [KITTY: TERMINAL]", "Ctrl + Shift + W", "Fechar janela / aba atual do terminal", "close_tab"),
+        ("💻 [KITTY: TERMINAL]", "Ctrl + Shift + ] / [", "Navegar para a próxima / anterior janela", "next_window"),
+        ("💻 [KITTY: TERMINAL]", "Ctrl + Shift + Right / Left", "Navegar para a próxima / anterior aba", "next_tab"),
+        ("💻 [KITTY: TERMINAL]", "Ctrl + Shift + C / V", "Copiar / Colar texto no terminal", "copy_to_clipboard"),
+        ("💻 [KITTY: TERMINAL]", "Ctrl + Shift + + / -", "Aumentar / Diminuir tamanho da fonte", "change_font_size"),
+        ("💻 [KITTY: TERMINAL]", "Ctrl + Shift + Backspace", "Restaurar tamanho padrão da fonte", "change_font_size"),
+        ("💻 [KITTY: TERMINAL]", "Ctrl + Shift + F", "Pesquisar texto no histórico do terminal", "show_scrollback"),
     ]
+    result = []
+    for cat, key, desc, act in items:
+        result.append(BindItem(
+            category=cat,
+            key=key,
+            desc=desc,
+            source_type="kitty",
+            source_file=KITTY_CONF,
+            line_number=0,
+            raw_key=key,
+            raw_action=act
+        ))
+    return result
 
 def get_dolphin_binds():
-    return [
-        ("📁 [DOLPHIN: ARQUIVOS]", "Super + E", "Abrir o gerenciador de arquivos Dolphin"),
-        ("📁 [DOLPHIN: ARQUIVOS]", "Ctrl + H", "Exibir / Ocultar arquivos e pastas ocultas"),
-        ("📁 [DOLPHIN: ARQUIVOS]", "F4", "Abrir / Fechar terminal integrado na pasta atual"),
-        ("📁 [DOLPHIN: ARQUIVOS]", "F3", "Modo de visão dividida (duas pastas lado a lado)"),
-        ("📁 [DOLPHIN: ARQUIVOS]", "Ctrl + T", "Abrir nova aba de navegação"),
-        ("📁 [DOLPHIN: ARQUIVOS]", "Ctrl + L", "Focar e editar barra de endereço / caminho"),
-        ("📁 [DOLPHIN: ARQUIVOS]", "Ctrl + D", "Adicionar pasta atual aos Favoritos"),
-        ("📁 [DOLPHIN: ARQUIVOS]", "Alt + Up", "Subir para a pasta pai"),
+    items = [
+        ("📁 [DOLPHIN: ARQUIVOS]", "Super + E", "Abrir o gerenciador de arquivos Dolphin", "dolphin"),
+        ("📁 [DOLPHIN: ARQUIVOS]", "Ctrl + H", "Exibir / Ocultar arquivos e pastas ocultas", "toggle_hidden"),
+        ("📁 [DOLPHIN: ARQUIVOS]", "F4", "Abrir / Fechar terminal integrado na pasta atual", "toggle_terminal"),
+        ("📁 [DOLPHIN: ARQUIVOS]", "F3", "Modo de visão dividida (duas pastas lado a lado)", "split_view"),
+        ("📁 [DOLPHIN: ARQUIVOS]", "Ctrl + T", "Abrir nova aba de navegação", "new_tab"),
+        ("📁 [DOLPHIN: ARQUIVOS]", "Ctrl + L", "Focar e editar barra de endereço / caminho", "edit_location"),
+        ("📁 [DOLPHIN: ARQUIVOS]", "Ctrl + D", "Adicionar pasta atual aos Favoritos", "add_bookmark"),
+        ("📁 [DOLPHIN: ARQUIVOS]", "Alt + Up", "Subir para a pasta pai", "go_up"),
     ]
+    result = []
+    for cat, key, desc, act in items:
+        result.append(BindItem(
+            category=cat,
+            key=key,
+            desc=desc,
+            source_type="dolphin",
+            source_file=KGLOBAL_SRC,
+            line_number=0,
+            raw_key=key,
+            raw_action=act
+        ))
+    return result
 
 def get_browser_binds():
-    return [
-        ("🌐 [NAVEGADOR: WEB]", "Ctrl + T", "Abrir nova aba"),
-        ("🌐 [NAVEGADOR: WEB]", "Ctrl + W", "Fechar aba atual"),
-        ("🌐 [NAVEGADOR: WEB]", "Ctrl + Shift + T", "Reabrir última aba fechada"),
-        ("🌐 [NAVEGADOR: WEB]", "Ctrl + L / F6", "Focar na barra de endereço / URL"),
-        ("🌐 [NAVEGADOR: WEB]", "Ctrl + Shift + N / P", "Nova janela em modo anônimo / privado"),
-        ("🌐 [NAVEGADOR: WEB]", "Ctrl + Tab / Shift+Tab", "Alternar entre abas do navegador"),
-        ("🌐 [NAVEGADOR: WEB]", "Ctrl + F", "Buscar texto na página web"),
+    items = [
+        ("🌐 [NAVEGADOR: WEB]", "Ctrl + T", "Abrir nova aba", "new_tab"),
+        ("🌐 [NAVEGADOR: WEB]", "Ctrl + W", "Fechar aba atual", "close_tab"),
+        ("🌐 [NAVEGADOR: WEB]", "Ctrl + Shift + T", "Reabrir última aba fechada", "undo_close_tab"),
+        ("🌐 [NAVEGADOR: WEB]", "Ctrl + Tab / Ctrl + Shift + Tab", "Alternar entre abas abertas", "switch_tabs"),
+        ("🌐 [NAVEGADOR: WEB]", "Ctrl + L / F6", "Focar na barra de endereço / pesquisa", "focus_address_bar"),
+        ("🌐 [NAVEGADOR: WEB]", "Ctrl + Shift + P / N", "Abrir nova janela anônima / privativa", "private_window"),
+        ("🌐 [NAVEGADOR: WEB]", "Ctrl + R / F5", "Recarregar página atual", "reload"),
+        ("🌐 [NAVEGADOR: WEB]", "Ctrl + F", "Pesquisar texto na página", "find_in_page"),
     ]
+    result = []
+    for cat, key, desc, act in items:
+        result.append(BindItem(
+            category=cat,
+            key=key,
+            desc=desc,
+            source_type="browser",
+            source_file="firefox/chrome",
+            line_number=0,
+            raw_key=key,
+            raw_action=act
+        ))
+    return result
 
 def extract_kde_binds():
     items = []
@@ -294,36 +402,144 @@ def extract_kde_binds():
         return items
 
     try:
-        cp = configparser.ConfigParser(interpolation=None)
-        cp.read(KGLOBAL_SRC, encoding="utf-8")
-        
-        # Módulos de interesse no KDE
-        interesting_sections = {
-            "kwin": "🪟 [KDE: KWIN]",
-            "kmix": "🔊 [KDE: ÁUDIO]",
-            "ksmserver": "⚡ [KDE: SESSÃO]",
-            "org.kde.spectacle.desktop": "📸 [KDE: CAPTURA]"
-        }
+        config = configparser.ConfigParser(interpolation=None)
+        config.read(KGLOBAL_SRC, encoding="utf-8")
+        for sec in config.sections():
+            prefix = "🔵 [KDE PLASMA]"
+            if "kwin" in sec.lower():
+                prefix = "🔵 [KDE: KWIN]"
+            elif "plasmashell" in sec.lower():
+                prefix = "🔵 [KDE: SHELL]"
 
-        for sec, prefix in interesting_sections.items():
-            if not cp.has_section(sec):
-                continue
-            for opt in cp.options(sec):
-                if opt.startswith("_"):
-                    continue
-                val = cp.get(sec, opt)
+            for opt in config[sec]:
+                val = config[sec][opt]
                 parts = [p.strip() for p in val.split(",")]
                 if len(parts) >= 3 and parts[0] != "none" and parts[0]:
                     key = parts[0].replace("\\t", " ou ").replace("Meta", "Super")
                     desc = parts[2]
-                    # Limpar nomes feios
                     if "Polonium" in desc or not desc:
                         continue
-                    items.append((prefix, key, desc))
+                    items.append(BindItem(
+                        category=prefix,
+                        key=key,
+                        desc=desc,
+                        source_type="kde",
+                        source_file=KGLOBAL_SRC,
+                        line_number=0,
+                        raw_key=key,
+                        raw_action=desc
+                    ))
     except Exception:
         pass
 
     return items
+
+def update_hypr_bind_in_file(filepath, line_num, new_readable_key, new_action=None, new_desc=None):
+    """Atualiza com segurança a linha exata do bind no arquivo Lua."""
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"Arquivo não encontrado: {filepath}")
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    if line_num < 1 or line_num > len(lines):
+        raise ValueError(f"Linha {line_num} inválida no arquivo {filepath}")
+
+    orig_line = lines[line_num - 1]
+    if "hl.bind(" not in orig_line:
+        found_idx = None
+        for idx in range(max(0, line_num - 6), min(len(lines), line_num + 5)):
+            if "hl.bind(" in lines[idx]:
+                found_idx = idx
+                break
+        if found_idx is not None:
+            line_num = found_idx + 1
+            orig_line = lines[found_idx]
+        else:
+            raise ValueError(f"Não foi possível localizar 'hl.bind' na linha {line_num}")
+
+    idx = orig_line.find("hl.bind(")
+    content = orig_line[idx + 8:].rstrip()
+    parts = content.split(",", 1)
+    if len(parts) < 2:
+        raise ValueError(f"Formato inesperado de hl.bind na linha {line_num}")
+
+    old_action_full = parts[1].strip()
+    new_lua_key = readable_key_to_lua(new_readable_key)
+
+    if new_action:
+        new_line = orig_line[:idx + 8] + f"{new_lua_key}, {new_action})\n"
+    else:
+        new_line = orig_line[:idx + 8] + f"{new_lua_key}, {old_action_full}\n"
+
+    # Backup
+    bak_path = filepath + ".bak"
+    with open(bak_path, "w", encoding="utf-8") as bak_f:
+        bak_f.writelines(lines)
+
+    # Atualizar comentário acima se fornecido
+    if new_desc and line_num > 1 and lines[line_num - 2].strip().startswith("--") and not lines[line_num - 2].strip().startswith("----"):
+        c_indent = lines[line_num - 2][:len(lines[line_num - 2]) - len(lines[line_num - 2].lstrip())]
+        lines[line_num - 2] = f"{c_indent}-- {new_desc}\n"
+
+    lines[line_num - 1] = new_line
+
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.writelines(lines)
+
+    subprocess.run(["hyprctl", "reload"], check=False)
+    return True
+
+def delete_hypr_bind_in_file(filepath, line_num):
+    """Exclui com segurança a linha exata de um atalho customizado."""
+    if not os.path.exists(filepath):
+        return False
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    if line_num < 1 or line_num > len(lines):
+        return False
+
+    # Backup
+    with open(filepath + ".bak", "w", encoding="utf-8") as bak_f:
+        bak_f.writelines(lines)
+
+    del lines[line_num - 1]
+    # Se a linha anterior for um comentário do atalho, remover também
+    if line_num - 2 >= 0 and lines[line_num - 2].strip().startswith("--"):
+        del lines[line_num - 2]
+
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.writelines(lines)
+
+    subprocess.run(["hyprctl", "reload"], check=False)
+    return True
+
+def update_kitty_bind(new_readable_key, action_name):
+    """Mapeia o atalho no kitty.conf."""
+    os.makedirs(os.path.dirname(KITTY_CONF), exist_ok=True)
+    kitty_key = new_readable_key.lower().replace(" + ", "+")
+    new_map = f"map {kitty_key} {action_name}\n"
+
+    lines = []
+    if os.path.exists(KITTY_CONF):
+        with open(KITTY_CONF, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+    updated = False
+    for i, l in enumerate(lines):
+        if l.strip().startswith("map ") and action_name in l:
+            lines[i] = new_map
+            updated = True
+            break
+
+    if not updated:
+        lines.append(new_map)
+
+    with open(KITTY_CONF, "w", encoding="utf-8") as f:
+        f.writelines(lines)
+    return True
 
 def get_all_binds():
     """Retorna a lista completa e estruturada de atalhos de todo o sistema."""
@@ -354,10 +570,10 @@ def get_all_binds():
 def main():
     all_binds = get_all_binds()
 
-    for cat, key, desc in all_binds:
-        cat_pad = pad_display(cat, 24)
-        key_pad = pad_display(key, 36)
-        print(f"{cat_pad} │ {key_pad} ➜  {desc}")
+    for item in all_binds:
+        cat_pad = pad_display(item["category"], 24)
+        key_pad = pad_display(item["key"], 36)
+        print(f"{cat_pad} │ {key_pad} ➜  {item['desc']}")
 
 if __name__ == "__main__":
     main()
