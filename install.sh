@@ -33,6 +33,8 @@ if command -v pacman >/dev/null 2>&1; then
         kde-cli-tools
         kdeconnect
         python3
+        pyside6
+        fzf
     )
     echo "Instalando pacotes base..."
     sudo pacman -S --needed --noconfirm "${PACKAGES[@]}"

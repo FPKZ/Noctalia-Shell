@@ -19,6 +19,7 @@ import configparser
 CONFIG_DIR = os.path.expanduser("~/.config")
 HYPR_DIR = os.path.join(CONFIG_DIR, "hypr")
 BINDS_LUA = os.path.join(HYPR_DIR, "config/binds.lua")
+CUSTOM_BINDS_LUA = os.path.join(HYPR_DIR, "config/custom_binds.lua")
 KGLOBAL_SRC = os.path.join(CONFIG_DIR, "kglobalshortcutsrc")
 
 def get_display_width(s: str) -> int:
@@ -194,12 +195,60 @@ def extract_hypr_binds():
                 last_comment = ""
 
     # Workspaces numéricos
-    items.append(("🗂️ [HYPR: WORKSPACE]", "Super + 1..9", "Alternar para workspace 1 a 9 no monitor"))
-    items.append(("🗂️ [HYPR: WORKSPACE]", "Super + Shift + 1..9", "Mover janela para workspace 1 a 9"))
-    items.append(("🗂️ [HYPR: WORKSPACE]", "Super + Ctrl + Setas", "Navegar para workspace adjacente"))
+    items.append(("🗂️ [HYPR: WORKSPACE]", "Super + Ctrl + 1..10", "Alternar para workspace 1 a 10 no monitor focado"))
+    items.append(("🗂️ [HYPR: WORKSPACE]", "Super + Ctrl + Down", "Criar / Pular para o próximo workspace vazio"))
+    items.append(("🗂️ [HYPR: WORKSPACE]", "Super + Ctrl + Left / Right", "Navegar para workspace anterior ou próximo"))
     items.append(("🗂️ [HYPR: WORKSPACE]", "Super + Scroll", "Rolar entre workspaces do monitor"))
-    items.append(("🖥️ [HYPR: MONITOR]", "Super + 1 / 2", "Focar no Monitor 1 ou Monitor 2"))
+    items.append(("🗂️ [HYPR: WORKSPACE]", "Super + Shift + Ctrl + 1..10", "Mover janela ativa para workspace 1 a 10"))
+    items.append(("🖥️ [HYPR: MONITOR]", "Super + 1 / 2", "Focar no Monitor 1 (HDMI) ou Monitor 2 (DP)"))
     items.append(("🖥️ [HYPR: MONITOR]", "Super + Shift + 1 / 2", "Mover janela para Monitor 1 ou Monitor 2"))
+
+    return items
+
+def extract_custom_binds():
+    items = []
+    if not os.path.exists(CUSTOM_BINDS_LUA):
+        return items
+
+    with open(CUSTOM_BINDS_LUA, "r", encoding="utf-8", errors="ignore") as f:
+        lines = f.readlines()
+
+    last_comment = ""
+    custom_cat = "⭐ [CUSTOM]"
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("--") and not stripped.startswith("----") and not stripped.startswith("-- ="):
+            c_text = stripped.lstrip("-").strip()
+            if c_text.lower().startswith("category:"):
+                custom_cat = c_text.split(":", 1)[1].strip()
+            else:
+                last_comment = c_text
+            continue
+
+        if "hl.bind(" in line:
+            idx = line.find("hl.bind(")
+            content = line[idx + 8:].rstrip()
+            parts = content.split(",", 1)
+            if len(parts) < 2:
+                continue
+            raw_key = parts[0].strip()
+            raw_action = parts[1].strip()
+
+            key = clean_key_name(raw_key)
+            desc = last_comment
+            if not desc:
+                m_cmd = re.search(r'exec_cmd\s*\(\s*["\']?([^"\']+)["\']?\s*\)', raw_action)
+                if m_cmd:
+                    desc = f"Executar: {m_cmd.group(1).replace('launchPrefix .. ', '').replace('uwsm app -- ', '')}"
+                else:
+                    desc = raw_action.replace("hl.dsp.", "").strip()
+
+            items.append((custom_cat, key, desc))
+            last_comment = ""
+            custom_cat = "⭐ [CUSTOM]"
+        else:
+            if not stripped.startswith("--"):
+                last_comment = ""
 
     return items
 
@@ -279,6 +328,9 @@ def extract_kde_binds():
 def get_all_binds():
     """Retorna a lista completa e estruturada de atalhos de todo o sistema."""
     all_binds = []
+
+    # 0. Atalhos Personalizados do Usuário (prioridade no topo)
+    all_binds.extend(extract_custom_binds())
 
     # 1. Hyprland & Noctalia Shell
     all_binds.extend(extract_hypr_binds())
