@@ -9,12 +9,14 @@ Setup completo, estável e portátil para **CachyOS / Arch Linux**, unindo o pod
 - ⌨️ **Teclado PT-BR ABNT2 Nativo:** Configurado diretamente em `inputs.lua` e sincronizado com o compositor.
 - 📜 **Cheatsheet Interativo de Teclas:** Pressione `Super + F1` ou `Super + /` para abrir um menu pesquisável com todos os atalhos do sistema.
 - 💾 **Restauração de Sessão Automática:** Script em segundo plano (`session.py`) que salva periodicamente as janelas e seus respectivos workspaces, restaurando-os silenciosamente após reiniciar o PC.
-- 🎨 **Consistência Visual do Dolphin / Apps KDE:** Integração via `qt6ct` e `noctalia.colors`. O Dolphin abre no modo escuro perfeito sem bugs de contraste ou fundo branco.
+- 🎨 **Consistência Visual do Dolphin / Apps KDE:** Integração via `qt6ct` e `noctalia.colors`. O Dolphin abre no modo escuro perfeito sem conflitar ou poluir a sessão do KDE Plasma.
+- 🖼️ **Wallpaper e Tema Material You:** O wallpaper personalizado é transferido e o Noctalia gera a paleta harmônica (M3 tonal spot + Oxocarbon) com dock e barra flutuante pré-configurados.
 - ⚡ **Eliminação de Piscadas no Boot (Early KMS):** O script instalador detecta automaticamente se a sua GPU é **AMD (`amdgpu`)**, **NVIDIA (`nvidia`)** ou **Intel (`i915`)** e injeta o módulo correto no `mkinitcpio.conf`.
 - 🔊 **AudioRelay Universal:** Script dinâmico em PipeWire (`setup-audiorelay.sh`) que detecta a placa de som padrão de qualquer PC e cria o canal de espelhamento e microfone virtual sem alterar seus dispositivos físicos.
 - 📱 **KDE Connect Integrado:** Serviço de usuário em segundo plano gerenciado pelo systemd com regras de firewall abertas por padrão.
 - 💻 **Terminal Kitty & Fish:** Configurado com `xterm-256color` e alias `ssh = kitten ssh` para conexões remotas sem quebra do comando `clear`.
-- 🖥️ **Monitores Dinâmicos:** Configuração universal adaptável a qualquer resolução e taxa de atualização (single ou multi-monitor).
+- 🖥️ **Detecção Automática de Monitores:** Detecta os monitores primários e secundários reais do hardware na instalação, adaptando resoluções e workspaces para laptops ou desktops.
+- 🛡️ **Coexistência 100% Segura com KDE Plasma:** Não substitui lançadores do sistema, não mexe no KWin/Plasma e reconstrói o cache de aplicativos (`kbuildsycoca6`) para garantir que os atalhos da barra de tarefas do KDE funcionem perfeitamente.
 
 ---
 
@@ -61,22 +63,40 @@ Ao término da instalação, encerre a sessão ou reinicie o computador e seleci
 
 ---
 
+## 🔄 Como Atualizar o Repositório com as Configurações do seu PC
+
+Para capturar qualquer nova alteração feita no seu sistema atual (atalhos, dock, cores, novos scripts ou wallpaper) e atualizar este repositório automaticamente:
+
+```bash
+cd ~/cachyos-hypr-noctalia
+./update-repo.sh            # Sincroniza e reconstrói o pacote de release local
+./update-repo.sh --commit   # Sincroniza e cria um commit no Git
+./update-repo.sh --push     # Sincroniza, commita e envia (push) para o GitHub/GitLab
+```
+
+---
+
 ## 📁 Estrutura do Repositório
 
 ```text
-├── applications/        # Lançadores .desktop ajustados (ex: Dolphin)
 ├── bin/                 # Utilitários executáveis (ex: setup-audiorelay.sh universal)
 ├── color-schemes/       # Temas de cores (Noctalia)
 ├── configs/             # Dotfiles (~/.config)
+│   ├── gtk-3.0/         # Estilos GTK 3 customizados
+│   ├── gtk-4.0/         # Estilos GTK 4 customizados
 │   ├── hypr/            # Configurações do Hyprland (Lua)
 │   ├── kitty/           # Configurações do Terminal Kitty
 │   ├── noctalia/        # Configurações da Shell Noctalia
 │   ├── qt6ct/           # Tema Qt6 para integração KDE/Dolphin
-│   ├── swash/           # Wallpaper e temas
+│   ├── swash/           # Capturas de tela e utilitários
 │   ├── systemd/         # Serviços de usuário (KDE Connect)
 │   └── uwsm/            # Gerenciador de sessão Wayland
 ├── icons/               # Cursores (Bibata-Modern-Ice)
+├── state/               # Estado e preferências do Noctalia (dock, opacidade, paletas)
+├── wallpapers/          # Papéis de parede incluídos
 ├── build-release.sh     # Script para empacotar o tar.gz da Release
 ├── install.sh           # Instalador automatizado universal
+├── sync-from-system.sh  # Sincronizador automático das configs do PC para o repositório
+├── update-repo.sh       # Atalho para o sync-from-system.sh
 └── README.md            # Esta documentação
 ```

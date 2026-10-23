@@ -1,0 +1,167 @@
+config_version = 15
+
+[bar.default]
+auto_hide_delay_ms = 500
+background_opacity = 0.78999998234212399
+center = [ "workspaces" ]
+end = [ "media", "spacer_1", "tray", "notifications", "network", "volume", "spacer_1", "session" ]
+margin_ends = 8
+margin_opposite_edge = 1
+scale = 1.0000000074505806
+start = [ "launcher", "spacer_1", "clock", "group:g1", "spacer_1", "active_window" ]
+thickness = 26
+
+    [[bar.default.capsule_group]]
+    accordion = false
+    accordion_direction = "end"
+    border = ""
+    border_width = 1.0
+    enabled = true
+    fill = "on_secondary"
+    id = "g1"
+    members = [ "temp", "sysmon_2", "sysmon_3" ]
+    opacity = 0.0
+    padding = 6.0
+
+[control_center]
+hidden_tabs = [ "weather" ]
+sidebar_section = "none"
+width = 800
+
+[dock]
+active_monitor_only = true
+auto_hide = true
+background_opacity = 0.58999998681247234
+enabled = true
+icon_size = 49
+reserve_space = false
+show_dots = true
+show_instance_count = false
+
+[lockscreen_widgets]
+enabled = false
+schema_version = 2
+widget_order = [ "lockscreen-login-box@HDMI-A-1", "lockscreen-login-box@DP-1" ]
+
+    [lockscreen_widgets.grid]
+    cell_size = 16
+    major_interval = 4
+    visible = true
+
+    [lockscreen_widgets.widget."lockscreen-login-box@DP-1"]
+    box_height = 196.0
+    box_width = 810.0
+    cx = 960.0
+    cy = 898.0
+    output = "DP-1"
+    placement_height = 1080.0
+    placement_width = 1920.0
+    rotation = 0.0
+    type = "login_box"
+
+        [lockscreen_widgets.widget."lockscreen-login-box@DP-1".settings]
+        background_color = "surface_variant"
+        background_opacity = 0.88
+        background_radius = 12.0
+        center_password_text = false
+        input_opacity = 1.0
+        input_radius = 6.0
+        layout = "regular"
+        show_caps_lock = true
+        show_keyboard_layout = true
+        show_login_button = true
+        show_media = true
+        show_password_reveal = true
+        show_session_buttons = true
+        show_unlock_hint = true
+        show_weather = true
+
+    [lockscreen_widgets.widget."lockscreen-login-box@HDMI-A-1"]
+    box_height = 196.0
+    box_width = 810.0
+    cx = 960.0
+    cy = 898.0
+    output = "HDMI-A-1"
+    placement_height = 1080.0
+    placement_width = 1920.0
+    rotation = 0.0
+    type = "login_box"
+
+        [lockscreen_widgets.widget."lockscreen-login-box@HDMI-A-1".settings]
+        background_color = "surface_variant"
+        background_opacity = 0.88
+        background_radius = 12.0
+        center_password_text = false
+        input_opacity = 1.0
+        input_radius = 6.0
+        layout = "regular"
+        show_caps_lock = true
+        show_keyboard_layout = true
+        show_login_button = true
+        show_media = true
+        show_password_reveal = true
+        show_session_buttons = true
+        show_unlock_hint = true
+        show_weather = true
+
+[notification]
+scale = 0.80000000447034836
+
+[plugins]
+enabled = [ "michael-retunzew/hyprland-settings", "profidev/hypr-screen-mirror", "linux-fertxo/hyprland-visual-editor" ]
+
+[shell]
+corner_radius_scale = 0.60000000894069672
+
+    [shell.panel]
+    control_center_position = "center"
+
+    [shell.screenshot]
+    copy_to_clipboard = true
+
+[theme]
+builtin = "Noctalia"
+community_palette = "Oxocarbon"
+mode = "dark"
+source = "wallpaper"
+wallpaper_scheme = "m3-tonal-spot"
+
+    [theme.templates]
+    builtin_ids = [ "alacritty", "btop", "gtk3", "gtk4", "hyprland", "kcolorscheme", "kitty", "qt" ]
+    community_ids = [ "antigravity", "discord", "telegram", "vscode", "steam", "konsole" ]
+
+[wallpaper]
+fill_mode = "center"
+
+    [wallpaper.default]
+    path = "/home/felipe/Imagens/wp15566549.jpg"
+
+    [wallpaper.last]
+    path = "/home/felipe/Imagens/wp15566549.jpg"
+
+    [wallpaper.monitors.DP-1]
+    path = "/home/felipe/Imagens/wp15566549.jpg"
+
+    [wallpaper.monitors.HDMI-A-1]
+    path = "/home/felipe/Imagens/wp15566549.jpg"
+
+[widget.active_window]
+max_length = 539
+min_length = 9
+title_scroll = "on_hover"
+
+[widget.battery]
+display_mode = "graphic"
+
+[widget.clock]
+format = "{:%H:%M}"
+
+[widget.network]
+show_label = false
+
+[widget.sysmon_3]
+show_value = false
+
+[widget.tray]
+capsule_opacity = 0.0
+hide_passive = false

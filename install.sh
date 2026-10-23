@@ -56,36 +56,91 @@ cp -r "$SCRIPT_DIR/configs/"* "$TARGET_HOME/.config/"
 # Ajustar caminho do tema do qt6ct para o HOME do usuário atual
 sed -i "s|color_scheme_path=.*|color_scheme_path=$TARGET_HOME/.config/qt6ct/colors/noctalia.conf|g" "$TARGET_HOME/.config/qt6ct/qt6ct.conf" 2>/dev/null || true
 
-# 3. Implantação de Ícones, Temas e Scripts de Usuário
+# Auto-detectar monitores reais de vídeo na máquina de instalação
+echo "Detectando monitores de vídeo conectados..."
+PRIMARY_DETECTED=$(hyprctl monitors 2>/dev/null | grep -E "^Monitor " | head -n1 | awk '{print $2}' || true)
+if [ -z "$PRIMARY_DETECTED" ]; then
+    PRIMARY_DETECTED=$(for f in /sys/class/drm/card*-*/status; do if [ -f "$f" ] && grep -q "^connected" "$f"; then basename $(dirname "$f") | cut -d'-' -f2-; break; fi; done)
+fi
+
+SECONDARY_DETECTED=$(hyprctl monitors 2>/dev/null | grep -E "^Monitor " | sed -n '2p' | awk '{print $2}' || true)
+if [ -z "$SECONDARY_DETECTED" ]; then
+    SECONDARY_DETECTED=$(for f in /sys/class/drm/card*-*/status; do if [ -f "$f" ] && grep -q "^connected" "$f"; then basename $(dirname "$f") | cut -d'-' -f2-; fi; done | sed -n '2p' || true)
+fi
+
+if [ -n "$PRIMARY_DETECTED" ]; then
+    echo "Monitor primário identificado: $PRIMARY_DETECTED"
+    sed -i "s|MONITOR1 = .*|MONITOR1 = \"$PRIMARY_DETECTED\"|g" "$TARGET_HOME/.config/hypr/config/variables.lua" 2>/dev/null || true
+    sed -i "s|PRIMARY_MONITOR = .*|PRIMARY_MONITOR = MONITOR1|g" "$TARGET_HOME/.config/hypr/config/variables.lua" 2>/dev/null || true
+fi
+
+if [ -n "$SECONDARY_DETECTED" ]; then
+    echo "Monitor secundário identificado: $SECONDARY_DETECTED"
+    sed -i "s|MONITOR2 = .*|MONITOR2 = \"$SECONDARY_DETECTED\"|g" "$TARGET_HOME/.config/hypr/config/variables.lua" 2>/dev/null || true
+else
+    sed -i "s|MONITOR2 = .*|MONITOR2 = \"\"|g" "$TARGET_HOME/.config/hypr/config/variables.lua" 2>/dev/null || true
+fi
+
+# 3. Implantação de Ícones, Temas, Wallpaper e Estado do Noctalia
 echo ""
-echo "-> [3/7] Instalando cursores, esquemas de cores e utilitários..."
+echo "-> [3/7] Instalando cursores, esquemas de cores, wallpaper e estado do Noctalia..."
 mkdir -p "$TARGET_HOME/.local/share/icons"
 mkdir -p "$TARGET_HOME/.local/share/color-schemes"
+mkdir -p "$TARGET_HOME/.local/share/wallpapers"
+mkdir -p "$TARGET_HOME/Imagens"
+mkdir -p "$TARGET_HOME/.local/state/noctalia"
 mkdir -p "$TARGET_HOME/.local/bin"
 
+# Cursores
 if [ -d "$SCRIPT_DIR/icons/Bibata-Modern-Ice" ]; then
     cp -r "$SCRIPT_DIR/icons/Bibata-Modern-Ice" "$TARGET_HOME/.local/share/icons/"
 fi
 
+# Esquema de cores
 if [ -f "$SCRIPT_DIR/color-schemes/noctalia.colors" ]; then
     cp "$SCRIPT_DIR/color-schemes/noctalia.colors" "$TARGET_HOME/.local/share/color-schemes/"
 fi
 
-if [ -d "$SCRIPT_DIR/applications" ]; then
-    mkdir -p "$TARGET_HOME/.local/share/applications"
-    cp -r "$SCRIPT_DIR/applications/"* "$TARGET_HOME/.local/share/applications/"
+# Wallpaper personalizado (usado pelo Noctalia para gerar o tema Material You)
+if [ -f "$SCRIPT_DIR/wallpapers/wp15566549.jpg" ]; then
+    echo "Copiando wallpaper para $TARGET_HOME/Imagens e $TARGET_HOME/.local/share/wallpapers..."
+    cp "$SCRIPT_DIR/wallpapers/wp15566549.jpg" "$TARGET_HOME/Imagens/wp15566549.jpg"
+    cp "$SCRIPT_DIR/wallpapers/wp15566549.jpg" "$TARGET_HOME/.local/share/wallpapers/wp15566549.jpg"
 fi
 
+# Estado e customização do Noctalia (dock, opacidade, widgets, temas da comunidade)
+if [ -d "$SCRIPT_DIR/state/noctalia" ]; then
+    echo "Restaurando estado e personalizações do Noctalia (dock, barra e paleta)..."
+    cp -r "$SCRIPT_DIR/state/noctalia/"* "$TARGET_HOME/.local/state/noctalia/"
+    # Ajustar caminhos absolutos do usuário no settings.toml e state.toml
+    sed -i "s|/home/[^/]*|$TARGET_HOME|g" "$TARGET_HOME/.local/state/noctalia/settings.toml" 2>/dev/null || true
+    sed -i "s|/home/[^/]*|$TARGET_HOME|g" "$TARGET_HOME/.local/state/noctalia/state.toml" 2>/dev/null || true
+fi
+
+# Utilitários de áudio / scripts de usuário
 if [ -d "$SCRIPT_DIR/bin" ]; then
     cp -r "$SCRIPT_DIR/bin/"* "$TARGET_HOME/.local/bin/"
     chmod +x "$TARGET_HOME/.local/bin/"* 2>/dev/null || true
 fi
 
-# 4. Configurar Dolphin para usar o tema escuro Noctalia
+# 4. Integridade do KDE Plasma e Configuração do Dolphin
 echo ""
-echo "-> [4/7] Configurando tema do Dolphin..."
+echo "-> [4/7] Garantindo integridade do KDE Plasma e tema do Dolphin..."
+# Remover qualquer substituição indesejada de desktop files que quebre a barra de tarefas do KDE
+rm -f "$TARGET_HOME/.local/share/applications/org.kde.dolphin.desktop" 2>/dev/null || true
+
+# Reconstruir cache de aplicativos e MIME para manter o KDE 100% responsivo
+if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database "$TARGET_HOME/.local/share/applications" 2>/dev/null || true
+fi
+if command -v kbuildsycoca6 >/dev/null 2>&1; then
+    echo "Reconstruindo cache do KDE (kbuildsycoca6)..."
+    kbuildsycoca6 --noincremental 2>/dev/null || true
+fi
+
+# Configurar Dolphin com o tema Noctalia apenas para consistência visual
 if [ -f "$TARGET_HOME/.config/dolphinrc" ]; then
-    if ! grep -q "\[UiSettings\]" "$TARGET_HOME/.config/dolphinrc"; then
+    if ! grep -q "ColorScheme=" "$TARGET_HOME/.config/dolphinrc"; then
         echo -e "\n[UiSettings]\nColorScheme=Noctalia" >> "$TARGET_HOME/.config/dolphinrc"
     fi
 else

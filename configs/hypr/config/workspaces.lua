@@ -1,5 +1,5 @@
 -- Workspace rules wiki https://wiki.hypr.land/Configuring/Basics/Workspace-Rules/
--- Regras dinâmicas para workspaces (adaptam-se a qualquer monitor conectado)
+-- Add your workspace rules here. Increment the workspace number as you go. Do not have duplicate workspaces.
 hl.workspace_rule({ workspace = "name:gaming", monitor = PRIMARY_MONITOR, default = true })
 hl.workspace_rule({ workspace = "1", monitor = MONITOR1, default = true, persistent = true })
 hl.workspace_rule({ workspace = "2", monitor = MONITOR1, default = true, persistent = true })
@@ -10,3 +10,6 @@ if MONITOR2 and MONITOR2 ~= "" then
     hl.workspace_rule({ workspace = "5", monitor = MONITOR2, default = true, persistent = true })
     hl.workspace_rule({ workspace = "6", monitor = MONITOR2, default = true, persistent = true })
 end
+
+-- For other layouts such as scrolling, see example below
+-- hl.workspace_rule({ workspace = "1", monitor = MONITOR1, default = true, persistent = true, layout = "scrolling" })

@@ -1,0 +1,12 @@
+[plugin_store]
+sort = "name_asc"
+
+[security_migrations]
+calendar_credentials_v1 = true
+
+[theme_templates]
+applied_builtin_ids = "alacritty btop gtk3 gtk4 hyprland kcolorscheme kitty qt"
+
+[wallpaper_panel]
+flatten = false
+sort = "name_asc"
