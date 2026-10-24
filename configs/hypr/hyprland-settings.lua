@@ -12,8 +12,21 @@ hl.config({
         rounding = 5,
     },
     input = {
-        kb_layout = "us",
-        kb_variant = "",
-        sensitivity = 0.7,
+        kb_layout = "br",
+        kb_model = "abnt2",
+        sensitivity = 0.0,
     },
+})
+
+hl.monitor({
+    output   = "desc:AOC 24B30HM2 27ZP8XA000768",
+    mode     = "1920x1080@74.97",
+    position = "1920x0",
+    scale    = 1,
+})
+hl.monitor({
+    output   = "desc:AOC 24B30HM2 27ZP6XA007296",
+    mode     = "1920x1080@100.00",
+    position = "0x0",
+    scale    = 1,
 })
