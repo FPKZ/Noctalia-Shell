@@ -22,7 +22,7 @@ import sys
 import os
 import re
 import subprocess
-from PySide6.QtCore import Qt, QSize, QEvent
+from PySide6.QtCore import Qt, QSize, QEvent, QFileSystemWatcher, QTimer
 from PySide6.QtGui import QFont, QColor, QPalette, QKeySequence, QShortcut, QIcon, QKeyEvent, QFontDatabase
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import (
@@ -41,6 +41,9 @@ VARIABLES_LUA = os.path.join(HYPR_DIR, "config/variables.lua")
 KITTY_CONF = os.path.join(CONFIG_DIR, "kitty/kitty.conf")
 KITTY_THEME = os.path.join(CONFIG_DIR, "kitty/themes/noctalia.conf")
 QT6CT_COLORS = os.path.join(CONFIG_DIR, "qt6ct/colors/noctalia.conf")
+GTK4_THEME = os.path.join(CONFIG_DIR, "gtk-4.0/noctalia.css")
+GTK3_THEME = os.path.join(CONFIG_DIR, "gtk-3.0/noctalia.css")
+HYPR_NOCTALIA = os.path.join(CONFIG_DIR, "hypr/noctalia.lua")
 SINGLETON_SOCKET = "hypr_keybinds_gui_singleton_socket"
 
 # Importar o parser universal
@@ -60,47 +63,93 @@ readable_key_to_lua = parser_mod.readable_key_to_lua
 
 # ==============================================================================
 # CARREGAMENTO DINÂMICO DO TEMA DO NOCTALIA
-# Lê diretamente os temas gerados pelo Noctalia Shell (Material You / Wallpaper)
+# Lê diretamente os tokens oficiais gerados pelo Noctalia Shell (Material You)
 # ==============================================================================
 def load_noctalia_theme():
+    # Paleta padrão segura (Material You Noctalia)
     theme = {
-        "DARK_BG": "#131318",
-        "CARD_BG": "#1a1b26",
-        "INPUT_BG": "#222436",
-        "BORDER_COLOR": "#46464f",
-        "ACCENT_PRIMARY": "#bcc2ff",
-        "ACCENT_SECONDARY": "#c4c5dd",
+        "DARK_BG": "#1a110e",
+        "CARD_BG": "#271e1a",
+        "INPUT_BG": "#271e1a",
+        "BORDER_COLOR": "#352823",
+        "ACCENT_PRIMARY": "#ffb595",
+        "ACCENT_PRIMARY_FG": "#542105",
+        "ACCENT_SECONDARY": "#e6bead",
         "ACCENT_CORAL": "#ffb4ab",
-        "ACCENT_GREEN": "#a8f5ba",
-        "ACCENT_BLUE": "#82aaff",
-        "TEXT_COLOR": "#e4e1e9",
-        "TEXT_MUTED": "#939ab7",
-        "HIGHLIGHT_BG": "#282a3e"
+        "ACCENT_GREEN": "#e6bead",
+        "ACCENT_BLUE": "#d2c78f",
+        "TEXT_COLOR": "#f1dfd8",
+        "TEXT_MUTED": "#b3a5a0",
+        "HIGHLIGHT_BG": "#392b26"
     }
 
-    if os.path.exists(KITTY_THEME):
-        with open(KITTY_THEME, "r", encoding="utf-8") as f:
-            for line in f:
-                parts = line.strip().split()
-                if len(parts) >= 2:
-                    k, v = parts[0], parts[1]
-                    if k == "background": theme["DARK_BG"] = v
-                    elif k == "foreground": theme["TEXT_COLOR"] = v
-                    elif k in ("active_border_color", "color2", "url_color"): theme["ACCENT_PRIMARY"] = v
-                    elif k == "color3": theme["ACCENT_SECONDARY"] = v
-                    elif k == "color1": theme["ACCENT_CORAL"] = v
-                    elif k in ("inactive_border_color", "color0"): theme["BORDER_COLOR"] = v
-                    elif k == "selection_background": theme["HIGHLIGHT_BG"] = v
+    # 1. Fonte primária oficial: GTK 4 ou GTK 3 (gerado pelo processador de templates do Noctalia)
+    css_file = GTK4_THEME if os.path.exists(GTK4_THEME) else (GTK3_THEME if os.path.exists(GTK3_THEME) else None)
+    if css_file:
+        try:
+            with open(css_file, "r", encoding="utf-8") as f:
+                content = f.read()
+            kv = {}
+            for m in re.finditer(r'@define-color\s+([a-zA-Z0-9_-]+)\s+([^;]+);', content):
+                kv[m.group(1).replace('-', '_')] = m.group(2).strip()
+            for m in re.finditer(r'--([a-zA-Z0-9_-]+):\s*([^;]+);', content):
+                kv[m.group(1).replace('-', '_')] = m.group(2).strip()
 
+            if 'window_bg_color' in kv: theme['DARK_BG'] = kv['window_bg_color']
+            if 'window_fg_color' in kv: theme['TEXT_COLOR'] = kv['window_fg_color']
+            if 'card_bg_color' in kv: theme['CARD_BG'] = kv['card_bg_color']
+            if 'popover_bg_color' in kv: theme['INPUT_BG'] = kv['popover_bg_color']
+            elif 'card_bg_color' in kv: theme['INPUT_BG'] = kv['card_bg_color']
+            if 'accent_color' in kv: theme['ACCENT_PRIMARY'] = kv['accent_color']
+            if 'accent_fg_color' in kv: theme['ACCENT_PRIMARY_FG'] = kv['accent_fg_color']
+            if 'warning_color' in kv: theme['ACCENT_BLUE'] = kv['warning_color']
+            if 'success_color' in kv: theme['ACCENT_GREEN'] = kv['success_color']
+            if 'destructive_bg_color' in kv: theme['ACCENT_CORAL'] = kv['destructive_bg_color']
+            elif 'error_color' in kv: theme['ACCENT_CORAL'] = kv['error_color']
+        except Exception as e:
+            print(f"[Noctalia Theme] Erro ao ler {css_file}: {e}")
+
+    # 2. Fonte secundária: Hyprland Noctalia Lua
+    elif os.path.exists(HYPR_NOCTALIA):
+        try:
+            with open(HYPR_NOCTALIA, "r", encoding="utf-8") as f:
+                content = f.read()
+            for m in re.finditer(r'local\s+([a-zA-Z0-9_]+)\s*=\s*"rgb\(([a-fA-F0-9]{6})\)"', content):
+                k, hex_c = m.group(1), f"#{m.group(2)}"
+                if k == "primary": theme['ACCENT_PRIMARY'] = hex_c
+                elif k == "surface": theme['DARK_BG'] = hex_c
+                elif k == "on_surface": theme['TEXT_COLOR'] = hex_c
+                elif k == "secondary": theme['ACCENT_SECONDARY'] = hex_c
+                elif k == "error": theme['ACCENT_CORAL'] = hex_c
+        except Exception as e:
+            print(f"[Noctalia Theme] Erro ao ler {HYPR_NOCTALIA}: {e}")
+
+    # 3. Fonte complementar: Kitty Themes
+    if os.path.exists(KITTY_THEME):
+        try:
+            with open(KITTY_THEME, "r", encoding="utf-8") as f:
+                for line in f:
+                    parts = line.strip().split()
+                    if len(parts) >= 2:
+                        k, v = parts[0], parts[1]
+                        if k == "selection_background": theme["HIGHLIGHT_BG"] = v
+                        elif k in ("active_border_color", "color2") and not css_file: theme["ACCENT_PRIMARY"] = v
+        except Exception as e:
+            print(f"[Noctalia Theme] Erro ao ler {KITTY_THEME}: {e}")
+
+    # 4. Cálculo de contraste harmonioso para bordas e tons atenuados
     bg = QColor(theme["DARK_BG"])
-    if bg.lightness() < 128:
-        theme["CARD_BG"] = bg.lighter(130).name()
-        theme["INPUT_BG"] = bg.lighter(150).name()
-        theme["TEXT_MUTED"] = QColor(theme["TEXT_COLOR"]).darker(140).name()
+    fg = QColor(theme["TEXT_COLOR"])
+    is_dark = bg.lightness() < 128
+
+    if is_dark:
+        theme['BORDER_COLOR'] = QColor(theme['CARD_BG']).lighter(135).name()
+        theme['TEXT_MUTED'] = fg.darker(135).name()
+        theme['HIGHLIGHT_BG'] = QColor(theme['CARD_BG']).lighter(145).name()
     else:
-        theme["CARD_BG"] = bg.darker(110).name()
-        theme["INPUT_BG"] = bg.darker(120).name()
-        theme["TEXT_MUTED"] = QColor(theme["TEXT_COLOR"]).lighter(140).name()
+        theme['BORDER_COLOR'] = QColor(theme['CARD_BG']).darker(115).name()
+        theme['TEXT_MUTED'] = fg.lighter(135).name()
+        theme['HIGHLIGHT_BG'] = QColor(theme['CARD_BG']).darker(115).name()
 
     return theme
 
@@ -159,7 +208,7 @@ QPushButton.HeaderAction:hover {{
 
 QPushButton.PrimaryAction {{
     background-color: {t['ACCENT_PRIMARY']};
-    color: {t['DARK_BG']};
+    color: {t.get('ACCENT_PRIMARY_FG', t['DARK_BG'])};
     border: 1px solid {t['ACCENT_PRIMARY']};
     border-radius: 8px;
     padding: 8px 18px;
@@ -167,7 +216,8 @@ QPushButton.PrimaryAction {{
 }}
 
 QPushButton.PrimaryAction:hover {{
-    background-color: #d1d5ff;
+    opacity: 0.9;
+    border-color: {t['ACCENT_SECONDARY']};
 }}
 
 QPushButton.DangerAction {{
@@ -199,11 +249,12 @@ QPushButton.FilterChip {{
 QPushButton.FilterChip:hover {{
     background-color: {t['INPUT_BG']};
     color: {t['TEXT_COLOR']};
+    border-color: {t['ACCENT_PRIMARY']};
 }}
 
 QPushButton.FilterChip:checked {{
     background-color: {t['ACCENT_PRIMARY']};
-    color: {t['DARK_BG']};
+    color: {t.get('ACCENT_PRIMARY_FG', t['DARK_BG'])};
     font-weight: bold;
     border-color: {t['ACCENT_PRIMARY']};
 }}
@@ -229,7 +280,7 @@ QTableWidget#BindsTable::item:selected {{
 }}
 
 QHeaderView::section {{
-    background-color: {t['INPUT_BG']};
+    background-color: {t['DARK_BG']};
     color: {t['ACCENT_SECONDARY']};
     font-weight: bold;
     padding: 6px;
@@ -743,6 +794,96 @@ class KeybindsWindow(QWidget):
         self.setup_ui()
         self.populate_table(self.raw_binds)
         self.setup_keyboard_shortcuts()
+        self.setup_theme_watcher()
+
+    def setup_theme_watcher(self):
+        """Monitora em tempo real alterações nos arquivos de tema do Noctalia."""
+        self.theme_watcher = QFileSystemWatcher(self)
+        watch_files = [GTK4_THEME, GTK3_THEME, HYPR_NOCTALIA, KITTY_THEME]
+        for f in watch_files:
+            if os.path.exists(f):
+                self.theme_watcher.addPath(f)
+        self.theme_watcher.fileChanged.connect(self.on_theme_file_changed)
+
+    def on_theme_file_changed(self, path):
+        # Pequeno atraso para aguardar a finalização de escritas atômicas pelo Noctalia
+        QTimer.singleShot(80, lambda: self._handle_file_changed(path))
+
+    def _handle_file_changed(self, path):
+        if os.path.exists(path) and path not in self.theme_watcher.files():
+            self.theme_watcher.addPath(path)
+        self.apply_theme()
+
+    def apply_theme(self, new_theme=None):
+        """Re-aplica dinamicamente a paleta atualizada do Noctalia em todos os componentes."""
+        if new_theme is None:
+            self.theme = load_noctalia_theme()
+        else:
+            self.theme = new_theme
+
+        # 1. Atualizar stylesheet global da aplicação
+        app = QApplication.instance()
+        if app:
+            app.setStyleSheet(build_stylesheet(self.theme))
+
+        # 2. Forçar re-polimento do estilo da janela
+        self.style().unpolish(self)
+        self.style().polish(self)
+        self.update()
+
+        # 3. Atualizar estilos com propriedades inline
+        if hasattr(self, 'files_menu'):
+            self.files_menu.setStyleSheet(
+                f"background-color: {self.theme['CARD_BG']}; "
+                f"color: {self.theme['TEXT_COLOR']}; "
+                f"border: 1px solid {self.theme['BORDER_COLOR']};"
+            )
+        if hasattr(self, 'banner_label'):
+            self.banner_label.setStyleSheet(
+                f"background-color: {self.theme['INPUT_BG']}; "
+                f"color: {self.theme['ACCENT_GREEN']}; "
+                f"border: 1px solid {self.theme['BORDER_COLOR']}; "
+                f"border-radius: 6px; padding: 6px 12px; font-weight: 500;"
+            )
+
+        # 4. Atualizar cores de todos os itens da tabela
+        self.update_table_item_colors()
+
+    def update_table_item_colors(self):
+        """Atualiza instantaneamente os tons de todas as linhas já renderizadas."""
+        if not hasattr(self, 'table'):
+            return
+        self.table.setUpdatesEnabled(False)
+        for row in range(self.table.rowCount()):
+            item_cat = self.table.item(row, 0)
+            if item_cat:
+                t = item_cat.text().upper()
+                if "CUSTOM" in t:
+                    item_cat.setForeground(QColor(self.theme['ACCENT_CORAL']))
+                elif any(k in t for k in ("HYPR", "JANELA", "MONITOR", "WORKSPACE")):
+                    item_cat.setForeground(QColor(self.theme['TEXT_COLOR']))
+                else:
+                    item_cat.setForeground(QColor(self.theme['ACCENT_GREEN']))
+
+            item_key = self.table.item(row, 1)
+            if item_key:
+                item_key.setForeground(QColor(self.theme['ACCENT_PRIMARY']))
+
+            item_desc = self.table.item(row, 2)
+            if item_desc:
+                item_desc.setForeground(QColor(self.theme['TEXT_COLOR']))
+
+            item_src = self.table.item(row, 3)
+            if item_src:
+                item_src.setForeground(QColor(self.theme['ACCENT_BLUE']))
+
+            item_act = self.table.item(row, 4)
+            if item_act:
+                is_exec = "↵" in item_act.text() or "▶" in item_act.text()
+                item_act.setForeground(QColor(self.theme['ACCENT_GREEN'] if is_exec else self.theme['ACCENT_SECONDARY']))
+
+        self.table.setUpdatesEnabled(True)
+        self.table.viewport().update()
 
     def load_binds(self):
         self.raw_binds = get_all_binds()
@@ -1048,8 +1189,7 @@ class KeybindsWindow(QWidget):
 
     def reload_system_binds(self):
         subprocess.run(["hyprctl", "reload"], check=False)
-        self.theme = load_noctalia_theme()
-        QApplication.instance().setStyleSheet(build_stylesheet(self.theme))
+        self.apply_theme()
         self.load_binds()
         self.filter_binds()
         self.show_banner("🔄 Atalhos e tema recarregados com sucesso!")
@@ -1099,6 +1239,10 @@ class KeybindsWindow(QWidget):
             item_cat = QTableWidgetItem(cat)
             item_cat.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
             if "CUSTOM" in cat.upper():
+                item_cat.setForeground(QColor(self.theme['ACCENT_CORAL']))
+            elif any(k in cat.upper() for k in ("HYPR", "JANELA", "MONITOR", "WORKSPACE")):
+                item_cat.setForeground(QColor(self.theme['TEXT_COLOR']))
+            else:
                 item_cat.setForeground(QColor(self.theme['ACCENT_GREEN']))
 
             item_key = QTableWidgetItem(self.format_key(key))
@@ -1232,8 +1376,7 @@ def main():
                     if window.isVisible():
                         window.hide()
                     else:
-                        window.theme = load_noctalia_theme()
-                        app.setStyleSheet(build_stylesheet(window.theme))
+                        window.apply_theme()
                         window.show()
                         window.raise_()
                         window.activateWindow()
@@ -1241,6 +1384,7 @@ def main():
                 else:
                     window.close()
             elif msg == "show":
+                window.apply_theme()
                 window.show()
                 window.raise_()
                 window.activateWindow()

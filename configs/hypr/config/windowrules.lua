@@ -128,5 +128,5 @@ hl.layer_rule({
 })
 
 -- Cheatsheet / Menu de Atalhos Flutuante
-hl.window_rule({ match = { class = "^(hypr-cheatsheet)$" }, float = true, center = true, pin = true })
-hl.window_rule({ match = { title = "^(Hyprland Keybinds Explorer)$" }, float = true, center = true, size = { "monitor_w*0.60", "monitor_h*0.65" }, pin = true })
+hl.window_rule({ match = { class = "^(hypr-cheatsheet)$" }, float = true, center = true, pin = true, dim_around = true })
+hl.window_rule({ match = { title = "^(Hyprland Keybinds Explorer)$" }, float = true, center = true, size = { "monitor_w*0.60", "monitor_h*0.65" }, pin = true, dim_around = true })
