@@ -117,6 +117,13 @@ if [ -d "$SCRIPT_DIR/state/noctalia" ]; then
     # Ajustar caminhos absolutos do usuário no settings.toml e state.toml
     sed -i "s|/home/[^/]*|$TARGET_HOME|g" "$TARGET_HOME/.local/state/noctalia/settings.toml" 2>/dev/null || true
     sed -i "s|/home/[^/]*|$TARGET_HOME|g" "$TARGET_HOME/.local/state/noctalia/state.toml" 2>/dev/null || true
+
+    # Garantir layout 'br' e modelo 'abnt2' no estado do plugin hyprland-settings
+    HS_STATE="$TARGET_HOME/.local/state/noctalia/plugins/data/michael-retunzew/hyprland-settings/state.json"
+    if [ -f "$HS_STATE" ]; then
+        sed -i 's/"input\.kb_layout":\s*{\s*"value":\s*"[^"]*"\s*}/"input.kb_layout":{"value":"br"}/g' "$HS_STATE" 2>/dev/null || true
+        sed -i 's/"input\.kb_model":\s*{\s*"value":\s*"[^"]*"\s*}/"input.kb_model":{"value":"abnt2"}/g' "$HS_STATE" 2>/dev/null || true
+    fi
 fi
 
 # Utilitários de áudio / scripts de usuário
