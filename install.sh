@@ -1,9 +1,21 @@
 #!/usr/bin/env bash
+# ==============================================================================
+# install.sh
+# Instalador Universal: CachyOS Hyprland + Noctalia Shell + Apps Pessoais
+# ==============================================================================
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_USER="$(whoami)"
 TARGET_HOME="$HOME"
+
+# Carregar utilitários de seleção, pacotes e dock
+if [ -f "$SCRIPT_DIR/bin/app-selector.sh" ]; then
+    source "$SCRIPT_DIR/bin/app-selector.sh"
+else
+    echo "Erro: '$SCRIPT_DIR/bin/app-selector.sh' não encontrado!"
+    exit 1
+fi
 
 echo "=========================================================="
 echo "  Instalador Universal: CachyOS Hyprland + Noctalia Shell"
@@ -11,8 +23,8 @@ echo "  Destino: Usuário $TARGET_USER ($TARGET_HOME)"
 echo "=========================================================="
 echo ""
 
-# 1. Verificar e instalar pacotes necessários
-echo "-> [1/7] Verificando e instalando componentes do Hyprland e Noctalia..."
+# 1. Verificar e instalar pacotes necessários e AUR Helper (yay)
+echo "-> [1/8] Verificando e instalando componentes do Hyprland, Noctalia e Yay..."
 if command -v pacman >/dev/null 2>&1; then
     # Lista atômica de pacotes para evitar conflitos de meta-pacotes com KDE Plasma
     PACKAGES=(
@@ -35,11 +47,16 @@ if command -v pacman >/dev/null 2>&1; then
         python3
         pyside6
         fzf
+        which
+        libnewt
     )
-    echo "Instalando pacotes base..."
+    echo "Instalando pacotes base do sistema..."
     sudo pacman -S --needed --noconfirm "${PACKAGES[@]}"
 
-    # Garantir audiorelay via AUR (yay/paru) se disponível
+    # Garantir que o gerenciador AUR 'yay' esteja instalado na máquina
+    ensure_yay_installed
+
+    # Garantir audiorelay via yay/paru se disponível
     if command -v yay >/dev/null 2>&1; then
         echo "Instalando audiorelay via yay..."
         yay -S --needed --noconfirm audiorelay 2>/dev/null || true
@@ -49,11 +66,18 @@ if command -v pacman >/dev/null 2>&1; then
     fi
 fi
 
-# 2. Implantação de Dotfiles
+# 2. Implantação de Dotfiles Base
 echo ""
-echo "-> [2/7] Implantando dotfiles em $TARGET_HOME/.config..."
+echo "-> [2/8] Implantando dotfiles base em $TARGET_HOME/.config..."
 mkdir -p "$TARGET_HOME/.config"
-cp -r "$SCRIPT_DIR/configs/"* "$TARGET_HOME/.config/"
+
+# Copiar dotfiles do sistema, ignorando pastas de apps opcionais
+for d in "$SCRIPT_DIR/configs/"*; do
+    b_name=$(basename "$d")
+    if [ "$b_name" != "apps" ] && [ "$b_name" != "custom-apps.conf" ]; then
+        cp -r "$d" "$TARGET_HOME/.config/"
+    fi
+done
 
 # Ajustar caminho do tema do qt6ct para o HOME do usuário atual
 sed -i "s|color_scheme_path=.*|color_scheme_path=$TARGET_HOME/.config/qt6ct/colors/noctalia.conf|g" "$TARGET_HOME/.config/qt6ct/qt6ct.conf" 2>/dev/null || true
@@ -83,9 +107,9 @@ else
     sed -i "s|MONITOR2 = .*|MONITOR2 = \"\"|g" "$TARGET_HOME/.config/hypr/config/variables.lua" 2>/dev/null || true
 fi
 
-# 3. Implantação de Ícones, Temas, Wallpaper e Estado do Noctalia
+# 3. Implantação de Ícones, Temas, Wallpaper e Estado do Noctalia (com Dock 100% ativa)
 echo ""
-echo "-> [3/7] Instalando cursores, esquemas de cores, wallpaper e estado do Noctalia..."
+echo "-> [3/8] Instalando cursores, esquemas de cores, wallpaper e estado do Noctalia..."
 mkdir -p "$TARGET_HOME/.local/share/icons"
 mkdir -p "$TARGET_HOME/.local/share/color-schemes"
 mkdir -p "$TARGET_HOME/.local/share/wallpapers"
@@ -118,6 +142,11 @@ if [ -d "$SCRIPT_DIR/state/noctalia" ]; then
     sed -i "s|/home/[^/]*|$TARGET_HOME|g" "$TARGET_HOME/.local/state/noctalia/settings.toml" 2>/dev/null || true
     sed -i "s|/home/[^/]*|$TARGET_HOME|g" "$TARGET_HOME/.local/state/noctalia/state.toml" 2>/dev/null || true
 
+    # Garantir sincronização ativa da Dock tanto em config.toml quanto em settings.toml
+    if [ -f "$TARGET_HOME/.local/state/noctalia/settings.toml" ]; then
+        sync_noctalia_dock "$TARGET_HOME/.local/state/noctalia/settings.toml" "$TARGET_HOME/.config/noctalia/config.toml"
+    fi
+
     # Garantir layout 'br' e modelo 'abnt2' no estado do plugin hyprland-settings
     HS_STATE="$TARGET_HOME/.local/state/noctalia/plugins/data/michael-retunzew/hyprland-settings/state.json"
     if [ -f "$HS_STATE" ]; then
@@ -132,13 +161,80 @@ if [ -d "$SCRIPT_DIR/bin" ]; then
     chmod +x "$TARGET_HOME/.local/bin/"* 2>/dev/null || true
 fi
 
-# 4. Integridade do KDE Plasma e Configuração do Dolphin
+# 4. Seleção Interativa e Instalação de Aplicativos Opcionais
 echo ""
-echo "-> [4/7] Garantindo integridade do KDE Plasma e tema do Dolphin..."
-# Remover qualquer substituição indesejada de desktop files que quebre a barra de tarefas do KDE
+echo "-> [4/8] Instalando aplicativos e configurações personalizadas..."
+MANIFEST_FILE="$SCRIPT_DIR/configs/custom-apps.conf"
+
+if [ -f "$MANIFEST_FILE" ]; then
+    INSTALL_CHECKLIST=()
+    declare -A APP_PKGS
+    declare -A APP_DESCS
+
+    while IFS=':' read -r f_name p_name d_desc d_status; do
+        [[ "$f_name" =~ ^#.*$ || -z "$f_name" ]] && continue
+        APP_PKGS["$f_name"]="$p_name"
+        APP_DESCS["$f_name"]="$d_desc"
+        INSTALL_CHECKLIST+=("$f_name" "$d_desc" "ON")
+    done < "$MANIFEST_FILE"
+
+    SELECTED_INSTALL=""
+    if [ "$1" == "--batch" ] || [ "$2" == "--batch" ] || [ "$1" == "--all" ] || [ "$2" == "--all" ] || [ ! -t 0 ]; then
+        echo "   Modo não-interativo ativo: instalando todos os aplicativos do pacote."
+        SELECTED_INSTALL=$(for k in "${!APP_PKGS[@]}"; do echo "$k"; done)
+    else
+        SELECTED_INSTALL=$(prompt_checklist "Instalação de Aplicativos Opcionais" \
+            "Selecione com [ESPAÇO] os aplicativos e configurações que deseja instalar nesta máquina:\n(Pressione ENTER para confirmar)" \
+            "${INSTALL_CHECKLIST[@]}")
+    fi
+
+    PACMAN_TO_INSTALL=()
+    AUR_TO_INSTALL=()
+
+    while IFS= read -r app_folder; do
+        app_folder=$(echo "$app_folder" | tr -d '"' | xargs)
+        [ -z "$app_folder" ] && continue
+
+        pkg="${APP_PKGS[$app_folder]}"
+        if [ -n "$pkg" ]; then
+            if ! pacman -Qi "$pkg" >/dev/null 2>&1; then
+                if pacman -Si "$pkg" >/dev/null 2>&1; then
+                    PACMAN_TO_INSTALL+=("$pkg")
+                else
+                    AUR_TO_INSTALL+=("$pkg")
+                fi
+            fi
+        fi
+
+        # Restaurar configuração do app
+        if [ -d "$SCRIPT_DIR/configs/apps/$app_folder" ]; then
+            echo "   Restaurando configurações de $app_folder..."
+            mkdir -p "$TARGET_HOME/.config/$app_folder"
+            cp -r "$SCRIPT_DIR/configs/apps/$app_folder/"* "$TARGET_HOME/.config/$app_folder/" 2>/dev/null || true
+            sed -i "s|/home/[^/]*|$TARGET_HOME|g" "$TARGET_HOME/.config/$app_folder/"*.json "$TARGET_HOME/.config/$app_folder/"*.conf 2>/dev/null || true
+        fi
+    done <<< "$SELECTED_INSTALL"
+
+    # Instalação dos pacotes pacman acumulados
+    if [ ${#PACMAN_TO_INSTALL[@]} -gt 0 ]; then
+        echo "   Instalando pacotes oficiais via pacman: ${PACMAN_TO_INSTALL[*]}"
+        sudo pacman -S --needed --noconfirm "${PACMAN_TO_INSTALL[@]}" 2>/dev/null || true
+    fi
+
+    # Instalação dos pacotes AUR acumulados via yay
+    if [ ${#AUR_TO_INSTALL[@]} -gt 0 ]; then
+        if command -v yay >/dev/null 2>&1; then
+            echo "   Instalando pacotes AUR via yay: ${AUR_TO_INSTALL[*]}"
+            yay -S --needed --noconfirm "${AUR_TO_INSTALL[@]}" 2>/dev/null || true
+        fi
+    fi
+fi
+
+# 5. Integridade do KDE Plasma e Configuração do Dolphin
+echo ""
+echo "-> [5/8] Garantindo integridade do KDE Plasma e tema do Dolphin..."
 rm -f "$TARGET_HOME/.local/share/applications/org.kde.dolphin.desktop" 2>/dev/null || true
 
-# Reconstruir cache de aplicativos e MIME para manter o KDE 100% responsivo
 if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database "$TARGET_HOME/.local/share/applications" 2>/dev/null || true
 fi
@@ -157,21 +253,18 @@ else
     echo -e "[UiSettings]\nColorScheme=Noctalia" > "$TARGET_HOME/.config/dolphinrc"
 fi
 
-# 5. Configurações de Rede: KDE Connect, AudioRelay e Firewall
+# 6. Configurações de Rede: KDE Connect, AudioRelay e Firewall
 echo ""
-echo "-> [5/7] Configurando KDE Connect e AudioRelay..."
+echo "-> [6/8] Configurando KDE Connect e AudioRelay..."
 if command -v ufw >/dev/null 2>&1; then
     echo "Liberando portas no firewall UFW..."
-    # Portas KDE Connect
     sudo ufw allow 1714:1764/udp comment "KDE Connect" 2>/dev/null || true
     sudo ufw allow 1714:1764/tcp comment "KDE Connect" 2>/dev/null || true
-    # Portas AudioRelay
     sudo ufw allow 59100:59200/tcp comment "AudioRelay" 2>/dev/null || true
     sudo ufw allow 59100:59200/udp comment "AudioRelay" 2>/dev/null || true
     sudo ufw reload 2>/dev/null || true
 fi
 
-# Ativar serviço em segundo plano do KDE Connect no systemd user
 systemctl --user daemon-reload 2>/dev/null || true
 systemctl --user enable --now kdeconnect.service 2>/dev/null || true
 
@@ -182,9 +275,9 @@ if [ -f "$TARGET_HOME/.config/fish/config.fish" ]; then
     fi
 fi
 
-# 6. Detecção de GPU e Prevenção de Flicker (Early KMS)
+# 7. Detecção de GPU e Prevenção de Flicker (Early KMS)
 echo ""
-echo "-> [6/7] Detectando GPU para configurar Early KMS e eliminar piscadas de tela..."
+echo "-> [7/8] Detectando GPU para configurar Early KMS e eliminar piscadas de tela..."
 if [ -f /etc/mkinitcpio.conf ]; then
     GPU_MODULE=""
     if lspci -k 2>/dev/null | grep -i -E "(vga|3d|display)" | grep -i "amdgpu" >/dev/null; then
@@ -211,9 +304,9 @@ if [ -f /etc/mkinitcpio.conf ]; then
     fi
 fi
 
-# 7. Sincronização com o gerenciador de login
+# 8. Sincronização com o gerenciador de login
 echo ""
-echo "-> [7/7] Sincronizando com tela de login (SDDM / plasmalogin)..."
+echo "-> [8/8] Sincronizando com tela de login (SDDM / plasmalogin)..."
 sudo mkdir -p /etc/sddm.conf.d 2>/dev/null || true
 if [ -d /usr/lib/sddm/sddm.conf.d ]; then
     sudo cp -n /usr/lib/sddm/sddm.conf.d/* /etc/sddm.conf.d/ 2>/dev/null || true
@@ -221,6 +314,7 @@ fi
 
 # Garantir permissões de execução nos scripts
 chmod +x "$TARGET_HOME/.config/hypr/scripts/"*.sh 2>/dev/null || true
+chmod +x "$TARGET_HOME/.local/bin/"* 2>/dev/null || true
 
 echo ""
 echo "=========================================================="

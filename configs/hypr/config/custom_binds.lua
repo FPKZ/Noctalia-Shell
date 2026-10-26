@@ -6,3 +6,8 @@
 local mainMod = "SUPER"
 local launchPrefix = "uwsm app -- "
 
+-- category: 🌌 Noctalia Shell
+-- Central de Controle Noctalia (Home)
+pcall(hl.unbind, mainMod .. " + Escape")
+hl.bind(mainMod .. " + SUPER_L", hl.dsp.exec_cmd("noctalia msg panel-toggle control-center home"), { release = true })
+

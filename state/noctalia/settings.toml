@@ -26,6 +26,36 @@ hidden_tabs = [ "weather" ]
 sidebar_section = "none"
 width = 800
 
+[desktop_widgets]
+schema_version = 2
+widget_order = [ "desktop-widget-0000000000000001" ]
+
+    [desktop_widgets.grid]
+    cell_size = 16
+    major_interval = 4
+    visible = false
+
+    [desktop_widgets.widget.desktop-widget-0000000000000001]
+    box_height = 0.0
+    box_width = 0.0
+    cx = 95.0
+    cy = 99.600006103515625
+    output = "DP-1"
+    placement_height = 1080.0
+    placement_width = 1920.0
+    rotation = 0.0
+    type = "sysmon"
+
+        [desktop_widgets.widget.desktop-widget-0000000000000001.settings]
+        background = true
+        background_color = "surface"
+        background_opacity = 0.059999999999999998
+        display = "graph"
+        shadow = true
+        show_label = true
+        stat = "ram_pct"
+        stat2 = "cpu_usage"
+
 [dock]
 active_monitor_only = true
 auto_hide = true
@@ -106,13 +136,14 @@ widget_order = [ "lockscreen-login-box@HDMI-A-1", "lockscreen-login-box@DP-1" ]
 scale = 0.80000000447034836
 
 [plugins]
-enabled = [ "michael-retunzew/hyprland-settings", "profidev/hypr-screen-mirror", "linux-fertxo/hyprland-visual-editor" ]
+enabled = [ "profidev/hypr-screen-mirror", "linux-fertxo/hyprland-visual-editor", "michael-retunzew/hyprland-settings" ]
 
 [shell]
 corner_radius_scale = 0.60000000894069672
 
     [shell.panel]
     control_center_position = "center"
+    transparency_mode = "soft"
 
     [shell.screenshot]
     copy_to_clipboard = true
@@ -163,3 +194,6 @@ show_value = false
 [widget.tray]
 capsule_opacity = 0.0
 hide_passive = false
+
+[widget.volume]
+show_label = false

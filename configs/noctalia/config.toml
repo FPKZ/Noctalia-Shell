@@ -141,3 +141,13 @@ capsule_fill = "on_primary"
 inactive_pill_size = 1.0
 pill_scale = 0.80
 show_labels = false
+
+[dock]
+active_monitor_only = true
+auto_hide = true
+background_opacity = 0.59
+enabled = true
+icon_size = 49
+reserve_space = false
+show_dots = true
+show_instance_count = false
