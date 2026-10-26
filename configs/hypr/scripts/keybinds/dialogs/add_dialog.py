@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..config import CUSTOM_BINDS_LUA
-from ..widgets.key_recorder import KeySequenceRecorder
+from ..widgets.key_recorder import KeySequenceRecorder, AccessibleButton
 
 # Importação defensiva das funções do keybinds-parser
 try:
@@ -38,11 +38,54 @@ class AddShortcutDialog(QDialog):
         self.setup_ui()
 
     def keyPressEvent(self, event: QKeyEvent):
-        # Quando NÃO estiver gravando atalho, a tecla ESC fecha normalmente a janela
-        if event.key() == Qt.Key.Key_Escape:
+        key = event.key()
+
+        # 1. Tecla ESC
+        if key == Qt.Key.Key_Escape:
             if not self.key_recorder.is_recording:
                 self.reject()
+                event.accept()
                 return
+            # Se estiver gravando, o eventFilter captura
+            return
+
+        # 2. Tecla Enter / Return
+        elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            if self.key_recorder.is_recording:
+                # Se estiver gravando, o eventFilter captura como 'Enter'
+                return
+
+            fw = self.focusWidget()
+            if fw == self.key_recorder.btn_record:
+                self.key_recorder.toggle_recording()
+                event.accept()
+                return
+            elif fw == self.key_recorder.btn_clear:
+                self.key_recorder.clear_combo()
+                event.accept()
+                return
+            elif fw == self.btn_cancel:
+                self.reject()
+                event.accept()
+                return
+            elif fw == self.btn_save:
+                self.save_shortcut()
+                event.accept()
+                return
+            elif isinstance(fw, QLineEdit):
+                # Se estiver digitando em campo de texto e der Enter, salvar diretamente!
+                self.save_shortcut()
+                event.accept()
+                return
+            elif isinstance(fw, QPushButton):
+                fw.click()
+                event.accept()
+                return
+
+            # Previne que o QDialog chame accept() sem salvar
+            event.accept()
+            return
+
         super().keyPressEvent(event)
 
     def setup_ui(self):
@@ -62,7 +105,7 @@ class AddShortcutDialog(QDialog):
         lbl_mod.setObjectName("SectionLabel")
         layout.addWidget(lbl_mod)
 
-        self.key_recorder = KeySequenceRecorder(initial_combo="Super + Return", theme=self.theme, parent=self)
+        self.key_recorder = KeySequenceRecorder(initial_combo="", theme=self.theme, parent=self)
         self.key_recorder.keySequenceChanged.connect(self.update_preview)
         layout.addWidget(self.key_recorder)
 
@@ -123,16 +166,16 @@ class AddShortcutDialog(QDialog):
         btn_box = QHBoxLayout()
         btn_box.addStretch()
 
-        btn_cancel = QPushButton("Cancelar", self)
-        btn_cancel.setProperty("class", "SecondaryAction")
-        btn_cancel.clicked.connect(self.reject)
+        self.btn_cancel = AccessibleButton("Cancelar", self)
+        self.btn_cancel.setProperty("class", "SecondaryAction")
+        self.btn_cancel.clicked.connect(self.reject)
 
-        btn_save = QPushButton("Salvar e Ativar Atalho", self)
-        btn_save.setProperty("class", "PrimaryAction")
-        btn_save.clicked.connect(self.save_shortcut)
+        self.btn_save = AccessibleButton("Salvar e Ativar Atalho", self)
+        self.btn_save.setProperty("class", "PrimaryAction")
+        self.btn_save.clicked.connect(self.save_shortcut)
 
-        btn_box.addWidget(btn_cancel)
-        btn_box.addWidget(btn_save)
+        btn_box.addWidget(self.btn_cancel)
+        btn_box.addWidget(self.btn_save)
         layout.addLayout(btn_box)
 
         # Focar inicialmente no botão de gravar para navegação ágil
@@ -168,11 +211,12 @@ class AddShortcutDialog(QDialog):
 
     def get_combo_string(self) -> str:
         readable = self.get_readable_combo()
+        if not readable:
+            return 'mainMod .. " + X"'
         return readable_key_to_lua(readable)
 
     def get_readable_combo(self) -> str:
-        combo = self.key_recorder.get_combo()
-        return combo if combo else "Super + Return"
+        return self.key_recorder.get_combo()
 
     def get_action_code(self) -> str:
         idx = self.action_type_combo.currentIndex()
@@ -206,7 +250,7 @@ class AddShortcutDialog(QDialog):
         readable = self.get_readable_combo()
         combo_lua = self.get_combo_string()
         action_lua = self.get_action_code()
-        desc = self.desc_input.text().strip() or f"Ação ({readable})"
+        desc = self.desc_input.text().strip() or (f"Ação ({readable})" if readable else "Nova Ação")
         cat = self.cat_combo.currentText()
 
         if self.is_release_bind():
@@ -218,7 +262,12 @@ class AddShortcutDialog(QDialog):
     def save_shortcut(self):
         combo = self.get_readable_combo()
         if not combo:
-            QMessageBox.warning(self, "Aviso", "Por favor, grave uma combinação de teclas para o atalho.")
+            QMessageBox.warning(
+                self, "Aviso",
+                "Por favor, grave uma combinação de teclas para o atalho.\n"
+                "(Pressione o botão 'Gravar Atalho' e tecle a combinação desejada)."
+            )
+            self.key_recorder.btn_record.setFocus()
             return
 
         desc = self.desc_input.text().strip() or f"Ação ({combo})"

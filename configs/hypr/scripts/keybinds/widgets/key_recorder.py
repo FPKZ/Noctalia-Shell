@@ -8,6 +8,20 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
 )
 
+class AccessibleButton(QPushButton):
+    """Botão acessível que responde perfeitamente tanto a Espaço quanto a Enter/Return."""
+    def __init__(self, text: str = "", parent=None):
+        super().__init__(text, parent)
+        self.setAutoDefault(False)
+        self.setDefault(False)
+
+    def keyPressEvent(self, event: QKeyEvent):
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            self.click()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
 class KeySequenceRecorder(QWidget):
     """
     Widget moderno para captura dinâmica de combinações de teclado.
@@ -41,8 +55,8 @@ class KeySequenceRecorder(QWidget):
         self.display_label.setMinimumHeight(42)
         row_layout.addWidget(self.display_label, 1)
 
-        # 2. Botão para Iniciar / Parar Gravação
-        self.btn_record = QPushButton("🎙️ Gravar Atalho", self)
+        # 2. Botão para Iniciar / Parar Gravação (Acessível via Enter / Espaço)
+        self.btn_record = AccessibleButton("🎙️ Gravar Atalho", self)
         self.btn_record.setMinimumHeight(42)
         self.btn_record.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_record.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -50,7 +64,7 @@ class KeySequenceRecorder(QWidget):
         row_layout.addWidget(self.btn_record)
 
         # 3. Botão para Limpar
-        self.btn_clear = QPushButton("✖", self)
+        self.btn_clear = AccessibleButton("✖", self)
         self.btn_clear.setMinimumHeight(42)
         self.btn_clear.setToolTip("Limpar atalho atual")
         self.btn_clear.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -114,7 +128,7 @@ class KeySequenceRecorder(QWidget):
         if self.current_combo:
             self.display_label.setText(f"⌨️  {self.current_combo}")
         else:
-            self.display_label.setText("⌨️  (Nenhum atalho configurado)")
+            self.display_label.setText("⌨️  (Pressione 'Gravar' para definir o atalho)")
 
     def get_combo(self) -> str:
         return self.current_combo

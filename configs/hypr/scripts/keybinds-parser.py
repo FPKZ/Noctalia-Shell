@@ -542,9 +542,15 @@ def delete_hypr_bind_in_file(filepath, line_num):
         bak_f.writelines(lines)
 
     del lines[line_num - 1]
-    # Se a linha anterior for um comentário do atalho, remover também
-    if line_num - 2 >= 0 and lines[line_num - 2].strip().startswith("--"):
-        del lines[line_num - 2]
+    curr_idx = line_num - 2
+    # Se houver pcall(hl.unbind, ...) na linha anterior, remover também
+    if curr_idx >= 0 and "pcall(hl.unbind" in lines[curr_idx]:
+        del lines[curr_idx]
+        curr_idx -= 1
+    # Se houver comentário do atalho, remover também
+    while curr_idx >= 0 and lines[curr_idx].strip().startswith("--") and not lines[curr_idx].strip().startswith("----") and not lines[curr_idx].strip().startswith("-- ="):
+        del lines[curr_idx]
+        curr_idx -= 1
 
     with open(filepath, "w", encoding="utf-8") as f:
         f.writelines(lines)

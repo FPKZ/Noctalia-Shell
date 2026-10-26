@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
 
 from ..config import VARIABLES_LUA
 from ..editor import open_file_in_editor
-from ..widgets.key_recorder import KeySequenceRecorder
+from ..widgets.key_recorder import KeySequenceRecorder, AccessibleButton
 
 # Importação defensiva das funções do keybinds-parser
 try:
@@ -44,11 +44,50 @@ class EditShortcutDialog(QDialog):
         self.setup_ui()
 
     def keyPressEvent(self, event: QKeyEvent):
-        # Quando NÃO estiver gravando atalho, ESC fecha normalmente a janela
-        if event.key() == Qt.Key.Key_Escape:
+        key = event.key()
+
+        # 1. Tecla ESC
+        if key == Qt.Key.Key_Escape:
             if not self.key_recorder.is_recording:
                 self.reject()
+                event.accept()
                 return
+            return
+
+        # 2. Tecla Enter / Return
+        elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            if self.key_recorder.is_recording:
+                return
+
+            fw = self.focusWidget()
+            if fw == self.key_recorder.btn_record:
+                self.key_recorder.toggle_recording()
+                event.accept()
+                return
+            elif fw == self.key_recorder.btn_clear:
+                self.key_recorder.clear_combo()
+                event.accept()
+                return
+            elif fw == self.btn_cancel:
+                self.reject()
+                event.accept()
+                return
+            elif fw == self.btn_save:
+                self.save_changes()
+                event.accept()
+                return
+            elif isinstance(fw, QLineEdit):
+                self.save_changes()
+                event.accept()
+                return
+            elif isinstance(fw, QPushButton):
+                fw.click()
+                event.accept()
+                return
+
+            event.accept()
+            return
+
         super().keyPressEvent(event)
 
     def setup_ui(self):
@@ -121,27 +160,27 @@ class EditShortcutDialog(QDialog):
 
         btn_box = QHBoxLayout()
         if self.bind_item.get("source_type") == "custom":
-            btn_del = QPushButton("🗑️ Excluir Atalho", self)
-            btn_del.setProperty("class", "DangerAction")
-            btn_del.clicked.connect(self.delete_shortcut)
-            btn_box.addWidget(btn_del)
+            self.btn_del = AccessibleButton("🗑️ Excluir Atalho", self)
+            self.btn_del.setProperty("class", "DangerAction")
+            self.btn_del.clicked.connect(self.delete_shortcut)
+            btn_box.addWidget(self.btn_del)
 
         if source_file and os.path.exists(source_file):
-            btn_open_file = QPushButton("📝 Abrir nesta Linha no Editor", self)
-            btn_open_file.setProperty("class", "SecondaryAction")
-            btn_open_file.clicked.connect(self.open_at_line)
-            btn_box.addWidget(btn_open_file)
+            self.btn_open_file = AccessibleButton("📝 Abrir nesta Linha no Editor", self)
+            self.btn_open_file.setProperty("class", "SecondaryAction")
+            self.btn_open_file.clicked.connect(self.open_at_line)
+            btn_box.addWidget(self.btn_open_file)
 
         btn_box.addStretch()
-        btn_cancel = QPushButton("Cancelar", self)
-        btn_cancel.setProperty("class", "SecondaryAction")
-        btn_cancel.clicked.connect(self.reject)
-        btn_box.addWidget(btn_cancel)
+        self.btn_cancel = AccessibleButton("Cancelar", self)
+        self.btn_cancel.setProperty("class", "SecondaryAction")
+        self.btn_cancel.clicked.connect(self.reject)
+        btn_box.addWidget(self.btn_cancel)
 
-        btn_save = QPushButton("💾 Salvar Alteração", self)
-        btn_save.setProperty("class", "PrimaryAction")
-        btn_save.clicked.connect(self.save_changes)
-        btn_box.addWidget(btn_save)
+        self.btn_save = AccessibleButton("💾 Salvar Alteração", self)
+        self.btn_save.setProperty("class", "PrimaryAction")
+        self.btn_save.clicked.connect(self.save_changes)
+        btn_box.addWidget(self.btn_save)
 
         layout.addLayout(btn_box)
 

@@ -82,13 +82,33 @@ class TestWidgetsAndDialogs(unittest.TestCase):
     def test_add_shortcut_dialog_instantiation_and_recording(self):
         dialog = AddShortcutDialog(theme=DEFAULT_THEME)
         self.assertIsNotNone(dialog)
-        combo = dialog.get_readable_combo()
-        self.assertIn("Super", combo)
+        self.assertEqual(dialog.get_readable_combo(), "")
 
         # Gravar Super avulso
         dialog.key_recorder.set_combo("Super (Soltar)")
         self.assertTrue(dialog.is_release_bind())
         self.assertEqual(dialog.get_combo_string(), 'mainMod .. " + SUPER_L"')
+
+    def test_enter_key_behavior_in_add_dialog(self):
+        dialog = AddShortcutDialog(theme=DEFAULT_THEME)
+        dialog.show()
+
+        # 1. Enter no botão Gravar inicia gravação sem fechar janela
+        dialog.key_recorder.btn_record.setFocus()
+        e_enter = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Return, Qt.KeyboardModifier.NoModifier)
+        dialog.keyPressEvent(e_enter)
+        self.assertTrue(dialog.key_recorder.is_recording)
+        self.assertTrue(dialog.isVisible())
+
+        # Parar gravação
+        dialog.key_recorder.stop_recording()
+
+        # 2. Enter em campo de texto dispara save_shortcut
+        saved = []
+        dialog.save_shortcut = lambda: saved.append(True)
+        dialog.action_param_input.setFocus()
+        dialog.keyPressEvent(e_enter)
+        self.assertEqual(saved, [True])
 
     def test_add_shortcut_noctalia_autodetect(self):
         dialog = AddShortcutDialog(theme=DEFAULT_THEME)
@@ -132,7 +152,7 @@ class TestWidgetsAndDialogs(unittest.TestCase):
 
     def test_escape_behavior_outside_and_inside_recording(self):
         dialog = AddShortcutDialog(theme=DEFAULT_THEME)
-        
+
         # 1. Quando NÃO está gravando, ESC aciona reject()
         rejected = []
         dialog.reject = lambda: rejected.append(True)
