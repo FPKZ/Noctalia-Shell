@@ -3,12 +3,19 @@ Servidor da Aplicação, Modo Daemon e Gestão Singleton IPC.
 Princípio da Responsabilidade Única (SRP): gerenciar o ciclo de vida do processo Qt e comunicação local via sockets.
 """
 import sys
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QProxyStyle, QStyle
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 
 from .config import SINGLETON_SOCKET
 from .theme import load_noctalia_theme, build_stylesheet
 from .window import KeybindsWindow
+
+class NoFocusRectStyle(QProxyStyle):
+    """Estilo proxy que elimina retângulos de foco pontilhados internos (PE_FrameFocusRect) em botões."""
+    def drawPrimitive(self, element, option, painter, widget=None):
+        if element == QStyle.PrimitiveElement.PE_FrameFocusRect:
+            return
+        super().drawPrimitive(element, option, painter, widget)
 
 class ApplicationServer:
     """Gerenciador do ciclo de vida da aplicação com suporte a singleton e daemon residente."""
@@ -16,6 +23,8 @@ class ApplicationServer:
     def __init__(self, is_daemon: bool = False):
         self.is_daemon = is_daemon
         self.app = QApplication.instance() or QApplication(sys.argv)
+        self.style_proxy = NoFocusRectStyle()
+        self.app.setStyle(self.style_proxy)
         self.app.setApplicationName("hypr-cheatsheet")
         self.app.setDesktopFileName("hypr-cheatsheet")
         self.app.setQuitOnLastWindowClosed(not self.is_daemon)

@@ -18,6 +18,9 @@ class TestTheme(unittest.TestCase):
         self.assertIn("QWidget#RootWindow", qss)
         self.assertIn(theme["DARK_BG"], qss)
         self.assertIn(theme["ACCENT_PRIMARY"], qss)
+        self.assertIn("QLabel#FieldLabel", qss)
+        self.assertIn("outline: none;", qss)
+        self.assertIn("QPushButton[class=\"PrimaryAction\"]", qss)
 
     def test_compatibility_functions(self):
         t1 = load_noctalia_theme()

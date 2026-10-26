@@ -98,6 +98,10 @@ QWidget#RootWindow, QDialog#AddShortcutDialog, QDialog#EditShortcutDialog {{
     border-radius: 16px;
 }}
 
+QLabel {{
+    color: {t['TEXT_COLOR']};
+}}
+
 QLabel#TitleLabel {{
     color: {t['TEXT_COLOR']};
     font-size: 1.35em;
@@ -115,6 +119,12 @@ QLabel#SectionLabel {{
     font-size: 0.95em;
 }}
 
+QLabel#FieldLabel, QLabel.FieldLabel, QLabel[class="FieldLabel"] {{
+    color: {t['TEXT_COLOR']};
+    font-weight: 600;
+    font-size: 0.92em;
+}}
+
 QLineEdit, QComboBox {{
     background-color: {t['INPUT_BG']};
     color: {t['TEXT_COLOR']};
@@ -127,72 +137,112 @@ QLineEdit:focus, QComboBox:focus {{
     border: 1px solid {t['ACCENT_PRIMARY']};
 }}
 
-QPushButton.HeaderAction {{
+QPushButton {{
+    outline: none;
+}}
+
+QPushButton:focus {{
+    outline: none;
+}}
+
+QPushButton.HeaderAction, QPushButton[class="HeaderAction"] {{
     background-color: {t['CARD_BG']};
     color: {t['TEXT_COLOR']};
     border: 1px solid {t['BORDER_COLOR']};
     border-radius: 8px;
     padding: 6px 12px;
     font-weight: 500;
+    outline: none;
 }}
 
-QPushButton.HeaderAction:hover {{
+QPushButton.HeaderAction:hover, QPushButton[class="HeaderAction"]:hover {{
     background-color: {t['INPUT_BG']};
     border-color: {t['ACCENT_PRIMARY']};
     color: {t['ACCENT_PRIMARY']};
 }}
 
-QPushButton.PrimaryAction {{
+QPushButton.HeaderAction:focus, QPushButton[class="HeaderAction"]:focus {{
+    outline: none;
+    border: 1px solid {t['ACCENT_PRIMARY']};
+}}
+
+QPushButton.PrimaryAction, QPushButton[class="PrimaryAction"] {{
     background-color: {t['ACCENT_PRIMARY']};
     color: {t.get('ACCENT_PRIMARY_FG', t['DARK_BG'])};
     border: 1px solid {t['ACCENT_PRIMARY']};
     border-radius: 8px;
     padding: 8px 18px;
     font-weight: bold;
+    outline: none;
 }}
 
-QPushButton.PrimaryAction:hover {{
+QPushButton.PrimaryAction:hover, QPushButton[class="PrimaryAction"]:hover {{
     opacity: 0.9;
     border-color: {t['ACCENT_SECONDARY']};
 }}
 
-QPushButton.DangerAction {{
+QPushButton.PrimaryAction:focus, QPushButton[class="PrimaryAction"]:focus {{
+    outline: none;
+    border: 2px solid {t['ACCENT_SECONDARY']};
+}}
+
+QPushButton.DangerAction, QPushButton[class="DangerAction"] {{
     background-color: #3d1e24;
     color: {t['ACCENT_CORAL']};
     border: 1px solid #662d35;
     border-radius: 8px;
     padding: 8px 16px;
     font-weight: bold;
+    outline: none;
 }}
 
-QPushButton.SecondaryAction {{
+QPushButton.DangerAction:focus, QPushButton[class="DangerAction"]:focus {{
+    outline: none;
+    border: 2px solid {t['ACCENT_CORAL']};
+}}
+
+QPushButton.SecondaryAction, QPushButton[class="SecondaryAction"] {{
     background-color: {t['CARD_BG']};
     color: {t['TEXT_MUTED']};
     border: 1px solid {t['BORDER_COLOR']};
     border-radius: 8px;
     padding: 8px 16px;
+    outline: none;
 }}
 
-QPushButton.FilterChip {{
+QPushButton.SecondaryAction:focus, QPushButton[class="SecondaryAction"]:focus {{
+    outline: none;
+    border: 1px solid {t['ACCENT_PRIMARY']};
+    color: {t['TEXT_COLOR']};
+}}
+
+QPushButton.FilterChip, QPushButton[class="FilterChip"] {{
     background-color: {t['CARD_BG']};
     color: {t['TEXT_MUTED']};
     border: 1px solid {t['BORDER_COLOR']};
     border-radius: 8px;
     padding: 5px 11px;
     font-weight: 500;
+    outline: none;
 }}
 
-QPushButton.FilterChip:hover {{
+QPushButton.FilterChip:hover, QPushButton[class="FilterChip"]:hover {{
     background-color: {t['INPUT_BG']};
     color: {t['TEXT_COLOR']};
     border-color: {t['ACCENT_PRIMARY']};
 }}
 
-QPushButton.FilterChip:checked {{
+QPushButton.FilterChip:focus, QPushButton[class="FilterChip"]:focus {{
+    outline: none;
+    border: 1px solid {t['ACCENT_PRIMARY']};
+}}
+
+QPushButton.FilterChip:checked, QPushButton[class="FilterChip"]:checked {{
     background-color: {t['ACCENT_PRIMARY']};
     color: {t.get('ACCENT_PRIMARY_FG', t['DARK_BG'])};
     font-weight: bold;
     border-color: {t['ACCENT_PRIMARY']};
+    outline: none;
 }}
 
 QTableWidget#BindsTable {{

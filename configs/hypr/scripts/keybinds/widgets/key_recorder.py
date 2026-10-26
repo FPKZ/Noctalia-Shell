@@ -88,23 +88,25 @@ class KeySequenceRecorder(QWidget):
         text_color = self.theme.get("TEXT_COLOR", "#ffffff")
         card_bg = self.theme.get("CARD_BG", "#252538")
 
+        text_muted = self.theme.get("TEXT_MUTED", "rgba(255, 255, 255, 0.6)")
+
         self.display_label.setStyleSheet(
             f"background-color: {input_bg}; border: 1px solid {border}; border-radius: 8px; "
             f"padding: 8px 14px; font-family: monospace; font-size: 14px; font-weight: bold; color: {accent};"
         )
         self.btn_record.setStyleSheet(
             f"QPushButton {{ background-color: {card_bg}; border: 1px solid {border}; border-radius: 8px; "
-            f"padding: 8px 18px; font-weight: bold; color: {text_color}; }} "
+            f"padding: 8px 18px; font-weight: bold; color: {text_color}; outline: none; }} "
             f"QPushButton:hover {{ background-color: {accent}; color: #000000; border-color: {accent}; }} "
-            f"QPushButton:focus {{ border: 2px solid {accent}; }}"
+            f"QPushButton:focus {{ outline: none; border: 2px solid {accent}; }}"
         )
         self.btn_clear.setStyleSheet(
             f"QPushButton {{ background-color: {card_bg}; border: 1px solid {border}; border-radius: 8px; "
-            f"padding: 8px 12px; font-weight: bold; color: {text_color}; }} "
+            f"padding: 8px 12px; font-weight: bold; color: {text_color}; outline: none; }} "
             f"QPushButton:hover {{ background-color: #ef4444; color: #ffffff; border-color: #ef4444; }} "
-            f"QPushButton:focus {{ border: 2px solid {accent}; }}"
+            f"QPushButton:focus {{ outline: none; border: 2px solid {accent}; }}"
         )
-        self.hint_label.setStyleSheet("color: rgba(255, 255, 255, 0.6); font-size: 11px;")
+        self.hint_label.setStyleSheet(f"color: {text_muted}; font-size: 11px;")
         self.hint_label.setText("💡 Pressione <b>Enter</b> ou <b>Espaço</b> em 'Gravar', aperte suas teclas no teclado e solte.")
         self.btn_record.setText("🎙️ Gravar Atalho")
 
@@ -116,8 +118,9 @@ class KeySequenceRecorder(QWidget):
         )
         self.btn_record.setStyleSheet(
             f"QPushButton {{ background-color: {accent_red}; border: 2px solid {accent_red}; border-radius: 8px; "
-            f"padding: 8px 18px; font-weight: bold; color: #ffffff; }} "
-            f"QPushButton:hover {{ background-color: #dc2626; border-color: #dc2626; }}"
+            f"padding: 8px 18px; font-weight: bold; color: #ffffff; outline: none; }} "
+            f"QPushButton:hover {{ background-color: #dc2626; border-color: #dc2626; }} "
+            f"QPushButton:focus {{ outline: none; border: 2px solid #ffffff; }}"
         )
         self.hint_label.setStyleSheet(f"color: {accent_red}; font-size: 12px; font-weight: bold;")
         self.hint_label.setText("🔴 Gravando... Pressione qualquer tecla ou combinação no teclado (ex: Super, Esc, Tab...) e solte.")

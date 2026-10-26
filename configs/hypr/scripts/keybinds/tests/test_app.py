@@ -1,10 +1,14 @@
 import unittest
 from PySide6.QtWidgets import QApplication
-from keybinds.app import ApplicationServer, try_send_singleton_command
+from keybinds.app import ApplicationServer, try_send_singleton_command, NoFocusRectStyle
 
 app = QApplication.instance() or QApplication([])
 
 class TestApp(unittest.TestCase):
+    def test_no_focus_rect_style(self):
+        style = NoFocusRectStyle()
+        self.assertIsNotNone(style)
+
     def test_application_server_instantiation(self):
         server = ApplicationServer(is_daemon=True)
         self.assertIsNotNone(server)

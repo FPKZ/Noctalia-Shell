@@ -113,7 +113,9 @@ class AddShortcutDialog(QDialog):
         grid = QGridLayout()
         grid.setSpacing(10)
 
-        grid.addWidget(QLabel("2. Categoria:"), 0, 0)
+        lbl_cat = QLabel("2. Categoria:")
+        lbl_cat.setProperty("class", "FieldLabel")
+        grid.addWidget(lbl_cat, 0, 0)
         self.cat_combo = QComboBox(self)
         self.cat_combo.addItems([
             "🚀 [APLICATIVO]",
@@ -124,7 +126,9 @@ class AddShortcutDialog(QDialog):
         ])
         grid.addWidget(self.cat_combo, 0, 1)
 
-        grid.addWidget(QLabel("3. Tipo de Ação:"), 1, 0)
+        lbl_type = QLabel("3. Tipo de Ação:")
+        lbl_type.setProperty("class", "FieldLabel")
+        grid.addWidget(lbl_type, 1, 0)
         self.action_type_combo = QComboBox(self)
         self.action_type_combo.addItems([
             "Abrir Aplicativo / Executar Comando",
@@ -137,13 +141,16 @@ class AddShortcutDialog(QDialog):
         grid.addWidget(self.action_type_combo, 1, 1)
 
         self.action_param_label = QLabel("Comando / App:")
+        self.action_param_label.setProperty("class", "FieldLabel")
         grid.addWidget(self.action_param_label, 2, 0)
         self.action_param_input = QLineEdit(self)
         self.action_param_input.setPlaceholderText("Ex: obs, spotify, discord, telegram-desktop, code...")
         self.action_param_input.textChanged.connect(self.update_preview)
         grid.addWidget(self.action_param_input, 2, 1)
 
-        grid.addWidget(QLabel("4. Descrição:"), 3, 0)
+        lbl_desc = QLabel("4. Descrição:")
+        lbl_desc.setProperty("class", "FieldLabel")
+        grid.addWidget(lbl_desc, 3, 0)
         self.desc_input = QLineEdit(self)
         self.desc_input.setPlaceholderText("Ex: Abrir Painel de Controle ou Focar Workspace 5")
         self.desc_input.textChanged.connect(self.update_preview)
