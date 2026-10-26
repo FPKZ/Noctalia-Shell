@@ -1,0 +1,28 @@
+{
+    "username": "cachy",
+    "salt": "1tUCjVfD1ffD-3qL",
+    "password": "D1F6F7EE6A4B353A728D0E01EB0413CEC549901508D6D6F0FF722E0394ECCE8D",
+    "root": {
+        "uniqueid": "85A60774-CCE0-842F-0F84-61FDC8A2ABE1",
+        "named_devices": [
+            {
+                "name": "Felipe",
+                "cert": "-----BEGIN CERTIFICATE-----\nMIICvzCCAaegAwIBAgIBADANBgkqhkiG9w0BAQsFADAjMSEwHwYDVQQDDBhOVklE\nSUEgR2FtZVN0cmVhbSBDbGllbnQwHhcNMjYwNjEyMTMyOTI0WhcNNDYwNjA3MTMy\nOTI0WjAjMSEwHwYDVQQDDBhOVklESUEgR2FtZVN0cmVhbSBDbGllbnQwggEiMA0G\nCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC4T0Oni6V2+62dZsLApi1Gnk6\/MXKD\nI6Q8xkjGFCSAh1qO+F+xwRa4NTHA\/cBdJ\/8h2I8DF3cWb\/SHh21GbHKd6hXAmcDJ\nx3YSm0Qsgr1xrBQz9yrhRsYaYCgK9EeHnUGWKy198BinDx0AefSQ+zfWjl5lnHQZ\nlTb6hHKnJFl8QsemvnC7lJ7JWIEwM1VNeIJcgYwi++9ELkH1NytgUzGwM4tnnMtl\nyyqSaM8eILZ5d15kcfSiXbI6JZAamISAI8GlgAhOgm+KOZYWCKTDNsiThIN7Yu8+\n3\/O0Cwb4YI0+csVdKPoqUc89++jpD3aMHynX7q30OJT0NzYc4jql53J9AgMBAAEw\nDQYJKoZIhvcNAQELBQADggEBAHPy4KRm4K\/g9aAMY2pumGDpoHhr+bklTEILXqWS\nFFcxkKnHHVknNIFqLvty+OX5pYTUW+CIgzHYS1U1fSVKJFB1VBScxJezA6rPFJv4\nJjuVEYviSvtq1vh6wPsCoQYukXI+1mPNKIw9eBbeaB0PTuuZyDio\/tgzFKZigPBL\n534yDrq8w6w71xqmzfVffAi48kvw0ZdTNDRaTr\/ybS9sucDecty6wUB4IyHf9++b\neNi8Bo3zyu7UpAeuTC\/KEsj2Hkd354dFJd4k8DenWicyq9CzXUi3ckcBXJYHuVJH\nXfv0ii6WVzVZb611dySvAoRMvxRo0ijHdQAwBEqbc5lIfo4=\n-----END CERTIFICATE-----\n",
+                "uuid": "07CB4B97-BB13-CC2B-6E14-69095FB60800",
+                "enabled": "true"
+            },
+            {
+                "name": "S24 Ultra",
+                "cert": "-----BEGIN CERTIFICATE-----\nMIICxjCCAa6gAwIBAgIIZ7sojFuPLY4wDQYJKoZIhvcNAQELBQAwIzEhMB8GA1UE\nAwwYTlZJRElBIEdhbWVTdHJlYW0gQ2xpZW50MB4XDTI2MDgxOTEzMTQxNFoXDTQ2\nMDgxOTEzMTQxNFowIzEhMB8GA1UEAwwYTlZJRElBIEdhbWVTdHJlYW0gQ2xpZW50\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzRyj4lWZucVGKrWVZaGT\nUnFYLT5twRCdYFD8Jvsdev2NQRgOaP+e9Mro1dY7roO8G2RhrvTQIzmkuQq3z42P\nzw4QZQI5hwCelMGrx08icu\/52yoSpaBR3OjyfvngpDBkdtI8WqS4ZijIBvOW\/yEX\n0mo5TO+qQRliiPUwhTtfLeetx2WswPxOoukHG0i+jwLDGwBIxwVIPxDmvyW6zjP6\n4mZjJHkjF6DrHEHxptMeiAnWShc5cCvURgJMLS38U+ulXqaNf6nNnoEQfjOXpqs3\nn8uq5ubEJC2dLfWaYcrf3+U4aLmPf4NU9\/Zch4oyzdMt7LHByLRUo\/Abq8qeI4Yq\n\/QIDAQABMA0GCSqGSIb3DQEBCwUAA4IBAQAFTKipQF4EnH0UCgnqnNno84O0S3\/B\nQEd5Ogts1uxepyue7XaRmfjooX25DY9zdtH9\/KTMXhDolbLEsMAfkzWotk9YeScS\n3KL2oOkmc7wn5FL\/oxhrDefdScnAkCEYRFBAwaMSXfK+nH\/A+nZyutrrW4IrQZi5\nZhqfoXFlScu8BHLlZHTcYj6WSlEN8K3FZOIItnKls0+j5llUAuCNPRCLSpZL9jQ4\n50Td6YN6f1F5aQvWOt+s4uyctlrEauZNacx2Tj+BhL9M58NLr1fVqfySz8f\/XG4w\njPPmtMiKkM2+d6sKrbNWo5bB\/NIeAVIdrEcONBZkJ4OR8MHh\/9ZLtrIy\n-----END CERTIFICATE-----\n",
+                "uuid": "B3366FED-1902-3E02-1A80-D5BBAF891B55",
+                "enabled": "true"
+            },
+            {
+                "name": "FPK - Casa",
+                "cert": "-----BEGIN CERTIFICATE-----\nMIICvzCCAaegAwIBAgIBADANBgkqhkiG9w0BAQsFADAjMSEwHwYDVQQDDBhOVklE\nSUEgR2FtZVN0cmVhbSBDbGllbnQwHhcNMjYxMDIxMTg0ODQzWhcNNDYxMDE2MTg0\nODQzWjAjMSEwHwYDVQQDDBhOVklESUEgR2FtZVN0cmVhbSBDbGllbnQwggEiMA0G\nCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDm\/TZkPYqhaE1oi8gZDRKjGbMmRAKr\nlZ\/A4plij\/NzXfZttiedMEfu2EPLcpGF8WdzB6jecUhYyMy5LnLLgmvfL+tA7WuD\nEpMVG4etQtSgeTVDCVJ+\/WDsqXod6mo91efgT8B4Wj8ClVljmapi29k6dtBrdlAj\n8aYvgJn8tsTNoqq4rTZ+os2+jDI\/gRYuYpWPy3idASKzWv2l6nteVeaCVa\/wNRwK\nO+p0w8TGVa2jQSNSRjLIPUI0bYNcci8X8YoT4mcjozBK2WYAo9nutOa6lXs3Y22T\nmBUVUZDlLyCtdlma6AHX9BWznhWnYp00rK6\/cL+2OCy8YXOAxqsC2f2LAgMBAAEw\nDQYJKoZIhvcNAQELBQADggEBACgfxqbGbGEfnnghktAOpF0LMyWwwPzTP5jwk4hq\ndTEByqVwF48K4OOqi+x\/tssEkXT0T3W6Dc8knm5jlRshxKRoMFFhabFpabV205IG\ngiQG12fUPi0wG6iiVkLc\/cYlGM5jtcxEro4XCR3x5IToSqQGqWadZmxuAvWantkJ\nO\/xEm7V0CBOCJvSyjHdvKYSwtnqe3rTNJxh\/tAtJMTdvemFEHtsjhh\/WPBgC8mBP\nWr0YbfBAjiFSSV5KDDoUe1GiwEQn1eZBKez9dM7cOYBKQLV+1KOC9odK3adGFUTE\njlB547q3tznSxStiUgM0hDnhxr71Qi9CV8fIiKXoVW0qrOc=\n-----END CERTIFICATE-----\n",
+                "uuid": "E3D216E0-0E6C-700C-5F0E-8762C81ED807",
+                "enabled": "true"
+            }
+        ]
+    }
+}

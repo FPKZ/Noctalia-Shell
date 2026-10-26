@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "browsers.extension.enabled": true,
+  "security.autolock.minutes": 60,
+  "developers.experience.enabled": true,
+  "developers.experience.dismissed": true,
+  "developers.experience.activityLog.enabled": true,
+  "security.authenticatedUnlock.enabled": true,
+  "sshAgent.storeKeyTitles": true,
+  "sshAgent.storeSshKeyTitlesResponseGiven": true,
+  "sshAgent.enabled": true,
+  "security.securityReview": "{\"V2\":{\"last_completed_version\":1,\"state\":\"dismissed\"}}",
+  "sshAgent.commitSigningBannerDismissed": true,
+  "developers.cliSharedLockState.enabled": true,
+  "authTags": {
+    "browsers.extension.enabled": "9gHbbotV1Fg2zboH5fvdRknlM0hLX0jdA6Hc66qLu0Y",
+    "developers.cliSharedLockState.enabled": "2GCDB13WwvztI1NmqFSkDPCh/ZonwYZxJkyqyeytOQA",
+    "developers.experience.activityLog.enabled": "UFJnZqWo9unZvggDHOixTcKzXVoF/8qC+Xz+TemL6Uw",
+    "developers.experience.dismissed": "b1EuoNyPx3KjCdz3z1jyAP671bKmDq9Li7uhw2nj6Fo",
+    "developers.experience.enabled": "GsNi+oZuMUEXnc6bP8VoXogN7nN/RYx9kVoyTYHF3rs",
+    "security.authenticatedUnlock.enabled": "i6Q1Al1nLocByozXk0wp6lpGS8mW3/AKIfXOx0f7aWU",
+    "security.autolock.minutes": "Tq9pQccCT1GS19D/CSKbVIEgUBBIV16SsRMKHX1CClI",
+    "security.securityReview": "j0HQ7W4Q91hJuz/6IMByOnSa0Eb4qur55mWGjHnkJEg",
+    "sshAgent.commitSigningBannerDismissed": "Rz9ENN9ob3cn06R/fYZmEHoLwhdwKi5S6hO0bChaEig",
+    "sshAgent.enabled": "mYhbnC/4Zxj4StDIQUFrlCqsa32EkNWzw9tqNN2PBm4",
+    "sshAgent.storeKeyTitles": "9LZJ18t6raoArSaTZ26Dy3yIVnHNhQt8XmjtFGuIpuk",
+    "sshAgent.storeSshKeyTitlesResponseGiven": "EuGO4N95XYp6vQzWtPI2VxY2znP7iWbqgTlOLuvRUSg"
+  }
+}

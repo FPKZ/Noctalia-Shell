@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FileZilla3 version="3.71.1" platform="*nix">
+	<Server Host="192.168.8.39" Port="22">
+		<Hostkey>AAAAC3NzaC1lZDI1NTE5AAAAIARplbncOHNb+nMHW42O+H6ZuhKE9uyj97dTKLUvcpQk</Hostkey>
+	</Server>
+</FileZilla3>
