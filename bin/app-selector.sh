@@ -80,54 +80,52 @@ scan_user_apps() {
 # Argumentos:
 #   $1 = Título da Janela
 #   $2 = Texto de Instrução
+#   $3 = Arquivo de saída para salvar os itens selecionados
 #   Array restante = lista de tuplas "TAG" "DESC" "STATUS"
 prompt_checklist() {
     local title="$1"
     local prompt="$2"
-    shift 2
+    local out_file="$3"
+    shift 3
     local items=("$@")
 
+    > "$out_file"
+
     # 1. Tentar whiptail se terminal estiver disponível
-    if [ -t 0 ] && [ -t 1 ] && command -v whiptail >/dev/null 2>&1; then
-        local choices
-        choices=$(whiptail --title "$title" \
-                           --checklist "$prompt" \
-                           22 78 12 \
-                           --separate-output \
-                           "${items[@]}" 3>&1 1>&2 2>&3) || true
-        echo "$choices"
+    if [ -t 0 ] && command -v whiptail >/dev/null 2>&1; then
+        whiptail --title "$title" \
+                 --checklist "$prompt" \
+                 22 78 12 \
+                 --separate-output \
+                 "${items[@]}" 2> "$out_file" || true
         return 0
     fi
 
     # 2. Tentar fzf se terminal estiver disponível
-    if [ -t 0 ] && [ -t 1 ] && command -v fzf >/dev/null 2>&1; then
+    if [ -t 0 ] && command -v fzf >/dev/null 2>&1; then
         local fzf_input=()
         local i=0
         while [ $i -lt ${#items[@]} ]; do
             local tag="${items[$i]}"
             local desc="${items[$((i+1))]}"
             local status="${items[$((i+2))]}"
-            fzf_input+=("$tag - $desc ($status)")
+            fzf_input+=("$tag - $desc")
             i=$((i+3))
         done
-        local selected
-        selected=$(printf "%s\n" "${fzf_input[@]}" | fzf --multi --prompt="Selecione com TAB > " --header="$title - $prompt" | awk '{print $1}') || true
-        echo "$selected"
+        printf "%s\n" "${fzf_input[@]}" | fzf --multi --prompt="Selecione com TAB e confirme com ENTER > " --header="$title - $prompt" | awk '{print $1}' > "$out_file" || true
         return 0
     fi
 
-    # 3. Fallback não-interativo ou texto puro: retorna todos os itens marcados como ON
-    local fallback_selected=()
+    # 3. Fallback não-interativo ou texto puro: grava todos os itens marcados como ON
     local i=0
     while [ $i -lt ${#items[@]} ]; do
         local tag="${items[$i]}"
         local status="${items[$((i+2))]}"
         if [ "$status" == "ON" ]; then
-            fallback_selected+=("$tag")
+            echo "$tag" >> "$out_file"
         fi
         i=$((i+3))
     done
-    printf "%s\n" "${fallback_selected[@]}"
 }
 
 # Garante a instalação do gerenciador yay (AUR Helper)

@@ -113,24 +113,27 @@ for app in "${CANDIDATES[@]}"; do
 done
 
 # Invocar seleção interativa se não houver flag silenciosa
-SELECTED_RAW=""
+TMP_SELECTED=$(mktemp)
 if [ "$1" == "--batch" ] || [ "$2" == "--batch" ] || [ "$1" == "--all" ] || [ "$2" == "--all" ] || [ ! -t 0 ]; then
     echo "   Modo não-interativo ativo: mantendo aplicativos salvos no manifesto."
-    SELECTED_RAW=$(for k in "${!PREV_SAVED[@]}"; do echo "$k"; done)
-    if [ -z "$SELECTED_RAW" ]; then
+    for k in "${!PREV_SAVED[@]}"; do
+        echo "$k" >> "$TMP_SELECTED"
+    done
+    if [ ! -s "$TMP_SELECTED" ]; then
         # Se manifesto não existia, seleciona os marcados com ON por padrão
         i=0
         while [ $i -lt ${#CHECKLIST_ITEMS[@]} ]; do
             if [ "${CHECKLIST_ITEMS[$((i+2))]}" == "ON" ]; then
-                SELECTED_RAW+="${CHECKLIST_ITEMS[$i]}"$'\n'
+                echo "${CHECKLIST_ITEMS[$i]}" >> "$TMP_SELECTED"
             fi
             i=$((i+3))
         done
     fi
 else
-    SELECTED_RAW=$(prompt_checklist "Sincronização Seletiva de Apps" \
+    prompt_checklist "Sincronização Seletiva de Apps" \
         "Marque com [ESPAÇO] os aplicativos e configurações que deseja exportar:\n(Use TAB para navegar, ESPAÇO para marcar e ENTER para confirmar)" \
-        "${CHECKLIST_ITEMS[@]}")
+        "$TMP_SELECTED" \
+        "${CHECKLIST_ITEMS[@]}"
 fi
 
 # Criar novo manifesto com os selecionados
@@ -164,7 +167,8 @@ while IFS= read -r sel_app; do
         --exclude="Cookies*" --exclude="Local Storage" --exclude="Shared*" \
         --exclude="WebStorage" --exclude="TransportSecurity" --exclude="Network Persistent State" \
         "$USER_HOME/.config/$sel_app/" "$SCRIPT_DIR/configs/apps/$sel_app/" 2>/dev/null || true
-done <<< "$SELECTED_RAW"
+done < "$TMP_SELECTED"
+rm -f "$TMP_SELECTED"
 
 # Remover do repositório pastas que foram desmarcadas
 for existing_app in "$SCRIPT_DIR/configs/apps/"*; do

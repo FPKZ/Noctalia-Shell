@@ -178,14 +178,17 @@ if [ -f "$MANIFEST_FILE" ]; then
         INSTALL_CHECKLIST+=("$f_name" "$d_desc" "ON")
     done < "$MANIFEST_FILE"
 
-    SELECTED_INSTALL=""
+    TMP_INSTALL_SEL=$(mktemp)
     if [ "$1" == "--batch" ] || [ "$2" == "--batch" ] || [ "$1" == "--all" ] || [ "$2" == "--all" ] || [ ! -t 0 ]; then
         echo "   Modo não-interativo ativo: instalando todos os aplicativos do pacote."
-        SELECTED_INSTALL=$(for k in "${!APP_PKGS[@]}"; do echo "$k"; done)
+        for k in "${!APP_PKGS[@]}"; do
+            echo "$k" >> "$TMP_INSTALL_SEL"
+        done
     else
-        SELECTED_INSTALL=$(prompt_checklist "Instalação de Aplicativos Opcionais" \
+        prompt_checklist "Instalação de Aplicativos Opcionais" \
             "Selecione com [ESPAÇO] os aplicativos e configurações que deseja instalar nesta máquina:\n(Pressione ENTER para confirmar)" \
-            "${INSTALL_CHECKLIST[@]}")
+            "$TMP_INSTALL_SEL" \
+            "${INSTALL_CHECKLIST[@]}"
     fi
 
     PACMAN_TO_INSTALL=()
@@ -213,7 +216,8 @@ if [ -f "$MANIFEST_FILE" ]; then
             cp -r "$SCRIPT_DIR/configs/apps/$app_folder/"* "$TARGET_HOME/.config/$app_folder/" 2>/dev/null || true
             sed -i "s|/home/[^/]*|$TARGET_HOME|g" "$TARGET_HOME/.config/$app_folder/"*.json "$TARGET_HOME/.config/$app_folder/"*.conf 2>/dev/null || true
         fi
-    done <<< "$SELECTED_INSTALL"
+    done < "$TMP_INSTALL_SEL"
+    rm -f "$TMP_INSTALL_SEL"
 
     # Instalação dos pacotes pacman acumulados
     if [ ${#PACMAN_TO_INSTALL[@]} -gt 0 ]; then
