@@ -141,6 +141,7 @@ ACTION_MAP = {
 def clean_key_name(k):
     k = k.replace('mainMod .. " + ', 'Super + ')
     k = k.replace('mainMod', 'Super')
+    k = k.replace('SUPER_L', 'Super (Soltar)')
     k = k.replace('"', '').strip()
     k = re.sub(r'\s*\+\s*', ' + ', k)
     k = k.replace('Return', 'Enter')
@@ -156,6 +157,10 @@ def clean_key_name(k):
 
 def readable_key_to_lua(readable_key):
     """Converte formato legível (ex: Super + Shift + Q) para código Lua do binds.lua."""
+    rk_clean = readable_key.strip()
+    if rk_clean in ("Super", "Super (Soltar)", "Super (Ao Soltar)", "SUPER_L"):
+        return '"SUPER_L"'
+
     parts = [p.strip() for p in readable_key.split("+")]
     lua_parts = []
     for p in parts:
@@ -168,15 +173,20 @@ def readable_key_to_lua(readable_key):
             lua_parts.append('"SHIFT"')
         elif pl == "alt":
             lua_parts.append('"ALT"')
-        elif pl == "enter":
+        elif pl in ("enter", "return"):
             lua_parts.append('"Return"')
-        elif pl == "esc":
+        elif pl in ("esc", "escape"):
             lua_parts.append('"Escape"')
         else:
             lua_parts.append(f'"{p}"')
 
+    if len(lua_parts) == 1 and lua_parts[0] == "mainMod":
+        return '"SUPER_L"'
+
     if lua_parts[0] == "mainMod":
-        rest = " + ".join([p.strip('"') for p in lua_parts[1:]])
+        rest = " + ".join([p.strip('"') for p in lua_parts[1:] if p.strip('"') != "mainMod"])
+        if not rest:
+            return '"SUPER_L"'
         return f'mainMod .. " + {rest}"'
     else:
         full = " + ".join([p.strip('"') for p in lua_parts])
@@ -201,7 +211,14 @@ def extract_hypr_binds():
 
         if "hl.bind(" in line:
             idx = line.find("hl.bind(")
-            content = line[idx + 8:].rstrip()
+            content = line[idx + 8:].strip()
+            last_paren = content.rfind(")")
+            last_comment_idx = content.rfind("--")
+            if last_comment_idx > last_paren:
+                content = content[:last_comment_idx].strip()
+            if content.endswith(")"):
+                content = content[:-1].strip()
+
             parts = content.split(",", 1)
             if len(parts) < 2:
                 continue
@@ -286,7 +303,14 @@ def extract_custom_binds():
 
         if "hl.bind(" in line:
             idx = line.find("hl.bind(")
-            content = line[idx + 8:].rstrip()
+            content = line[idx + 8:].strip()
+            last_paren = content.rfind(")")
+            last_comment_idx = content.rfind("--")
+            if last_comment_idx > last_paren:
+                content = content[:last_comment_idx].strip()
+            if content.endswith(")"):
+                content = content[:-1].strip()
+
             parts = content.split(",", 1)
             if len(parts) < 2:
                 continue
@@ -459,7 +483,14 @@ def update_hypr_bind_in_file(filepath, line_num, new_readable_key, new_action=No
             raise ValueError(f"Não foi possível localizar 'hl.bind' na linha {line_num}")
 
     idx = orig_line.find("hl.bind(")
-    content = orig_line[idx + 8:].rstrip()
+    content = orig_line[idx + 8:].strip()
+    last_paren = content.rfind(")")
+    last_comment_idx = content.rfind("--")
+    if last_comment_idx > last_paren:
+        content = content[:last_comment_idx].strip()
+    if content.endswith(")"):
+        content = content[:-1].strip()
+
     parts = content.split(",", 1)
     if len(parts) < 2:
         raise ValueError(f"Formato inesperado de hl.bind na linha {line_num}")
@@ -467,10 +498,14 @@ def update_hypr_bind_in_file(filepath, line_num, new_readable_key, new_action=No
     old_action_full = parts[1].strip()
     new_lua_key = readable_key_to_lua(new_readable_key)
 
-    if new_action:
-        new_line = orig_line[:idx + 8] + f"{new_lua_key}, {new_action})\n"
-    else:
-        new_line = orig_line[:idx + 8] + f"{new_lua_key}, {old_action_full}\n"
+    is_release = (new_lua_key == '"SUPER_L"' or "release" in old_action_full or "release" in (new_action or ""))
+    target_action = new_action.strip() if new_action else old_action_full
+    if is_release and "release" not in target_action:
+        target_action = f"{target_action}, {{ release = true }}"
+    elif not is_release and "{ release = true }" in target_action:
+        target_action = target_action.replace(", { release = true }", "").replace("{ release = true }", "").strip()
+
+    new_line = orig_line[:idx + 8] + f"{new_lua_key}, {target_action})\n"
 
     # Backup
     bak_path = filepath + ".bak"

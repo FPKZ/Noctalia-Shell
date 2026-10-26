@@ -152,36 +152,7 @@ class KeybindsWindow(QWidget):
     def load_binds(self):
         self.raw_binds = get_all_binds()
 
-    def setup_ui(self):
-        # Tamanho relativo à tela (60% largura, 65% altura)
-        screen = QApplication.primaryScreen()
-        if screen:
-            geo = screen.geometry()
-            target_w = max(800, min(1400, int(geo.width() * 0.60)))
-            target_h = max(550, min(900, int(geo.height() * 0.65)))
-            self.resize(target_w, target_h)
-        else:
-            self.resize(1140, 720)
-
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(24, 20, 24, 20)
-        main_layout.setSpacing(14)
-
-        # 1. Header (Título, Subtítulo e Botões de Gestão com Atalhos Visíveis)
-        header_layout = QHBoxLayout()
-        title_box = QVBoxLayout()
-        title_box.setSpacing(3)
-
-        title = QLabel("⌨️  Central de Atalhos do Sistema", self)
-        title.setObjectName("TitleLabel")
-        subtitle = QLabel("Hyprland • Workspaces • Noctalia • Terminal Kitty • Dolphin • KDE", self)
-        subtitle.setObjectName("SubtitleLabel")
-
-        title_box.addWidget(title)
-        title_box.addWidget(subtitle)
-        header_layout.addLayout(title_box)
-        header_layout.addStretch()
-
+    def buttons_header(self, header_layout):
         # Botão: Novo Atalho (Ctrl+N)
         btn_add = QPushButton("➕ Novo Atalho (Ctrl+N)", self)
         btn_add.setProperty("class", "HeaderAction")
@@ -223,6 +194,39 @@ class KeybindsWindow(QWidget):
         btn_reload.setProperty("class", "HeaderAction")
         btn_reload.clicked.connect(self.reload_system_binds)
         header_layout.addWidget(btn_reload)
+
+    def setup_ui(self):
+        # Tamanho relativo à tela (60% largura, 65% altura)
+        screen = QApplication.primaryScreen()
+        if screen:
+            geo = screen.geometry()
+            target_w = max(800, min(1400, int(geo.width() * 0.60)))
+            target_h = max(550, min(900, int(geo.height() * 0.65)))
+            self.resize(target_w, target_h)
+        else:
+            self.resize(1140, 720)
+
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(24, 20, 24, 20)
+        main_layout.setSpacing(14)
+
+        # 1. Header (Título, Subtítulo e Botões de Gestão com Atalhos Visíveis)
+        header_layout = QHBoxLayout()
+        title_box = QVBoxLayout()
+        title_box.setSpacing(3)
+
+        title = QLabel("⌨️  Central de Atalhos do Sistema", self)
+        title.setObjectName("TitleLabel")
+        subtitle = QLabel("Hyprland • Workspaces • Noctalia • Terminal Kitty • Dolphin • KDE", self)
+        subtitle.setObjectName("SubtitleLabel")
+
+        title_box.addWidget(title)
+        title_box.addWidget(subtitle)
+        header_layout.addLayout(title_box)
+        header_layout.addStretch()
+
+        # Futuramente adicinar implementação de ativado e desativado em uma tela de configs
+        # self.buttons_header(header_layout)
 
         # Dica ESC
         esc_hint = QLabel("<b>ESC</b> Fechar", self)
