@@ -1,0 +1,16 @@
+"""
+Pacote Modular do Menu de Atalhos do Hyprland + Noctalia Shell.
+Estruturado segundo os princípios SOLID e Deep Modules.
+"""
+
+from .config import (
+    CONFIG_DIR, HYPR_DIR, BINDS_LUA, CUSTOM_BINDS_LUA, VARIABLES_LUA,
+    KITTY_CONF, KITTY_THEME, QT6CT_COLORS, GTK4_THEME, GTK3_THEME,
+    HYPR_NOCTALIA, SINGLETON_SOCKET, DEFAULT_THEME
+)
+
+__all__ = [
+    "CONFIG_DIR", "HYPR_DIR", "BINDS_LUA", "CUSTOM_BINDS_LUA", "VARIABLES_LUA",
+    "KITTY_CONF", "KITTY_THEME", "QT6CT_COLORS", "GTK4_THEME", "GTK3_THEME",
+    "HYPR_NOCTALIA", "SINGLETON_SOCKET", "DEFAULT_THEME"
+]
