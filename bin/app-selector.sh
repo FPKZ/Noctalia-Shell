@@ -76,7 +76,7 @@ scan_user_apps() {
     printf "%s\n" "${apps[@]}" | sort
 }
 
-# Exibe checklist interativo no terminal (whiptail -> fzf -> fallback)
+# Exibe checklist interativo no terminal (TUI nativo Kitty -> fzf -> fallback)
 # Argumentos:
 #   $1 = Título da Janela
 #   $2 = Texto de Instrução
@@ -91,14 +91,18 @@ prompt_checklist() {
 
     > "$out_file"
 
-    # 1. Tentar whiptail se terminal estiver disponível
-    if [ -t 0 ] && command -v whiptail >/dev/null 2>&1; then
-        whiptail --title "$title" \
-                 --checklist "$prompt" \
-                 22 78 12 \
-                 --separate-output \
-                 "${items[@]}" 2> "$out_file" || true
-        return 0
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local tui_bin="$script_dir/app_selector_tui.py"
+
+    # 1. Tentar interface TUI nativa do terminal (Noctalia / Kitty)
+    if [ -t 0 ] && [ -f "$tui_bin" ]; then
+        if python3 "$tui_bin" --title "$title" --prompt "$prompt" --out "$out_file" "${items[@]}"; then
+            return 0
+        else
+            # Retorna 1 se o usuário cancelou (ESC ou Q)
+            return 1
+        fi
     fi
 
     # 2. Tentar fzf se terminal estiver disponível
@@ -112,11 +116,16 @@ prompt_checklist() {
             fzf_input+=("$tag - $desc")
             i=$((i+3))
         done
-        printf "%s\n" "${fzf_input[@]}" | fzf --multi --prompt="Selecione com TAB e confirme com ENTER > " --header="$title - $prompt" | awk '{print $1}' > "$out_file" || true
-        return 0
+        local fzf_res
+        fzf_res=$(printf "%s\n" "${fzf_input[@]}" | fzf --multi --prompt="📦 $prompt " --header="$title: TAB/ESPAÇO para marcar | ENTER para confirmar | ESC para cancelar" < /dev/tty | awk '{print $1}') || return 1
+        if [ -n "$fzf_res" ]; then
+            echo "$fzf_res" > "$out_file"
+            return 0
+        fi
+        return 1
     fi
 
-    # 3. Fallback não-interativo ou texto puro: grava todos os itens marcados como ON
+    # 3. Fallback não-interativo ou texto puro (quando executado sem TTY): grava todos os itens marcados como ON
     local i=0
     while [ $i -lt ${#items[@]} ]; do
         local tag="${items[$i]}"
@@ -126,6 +135,7 @@ prompt_checklist() {
         fi
         i=$((i+3))
     done
+    return 0
 }
 
 # Garante a instalação do gerenciador yay (AUR Helper)

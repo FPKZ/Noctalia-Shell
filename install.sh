@@ -66,9 +66,46 @@ if command -v pacman >/dev/null 2>&1; then
     fi
 fi
 
-# 2. Implantação de Dotfiles Base
+# 2. Seleção Interativa de Aplicativos Opcionais (Antes de tocar nos dotfiles)
 echo ""
-echo "-> [2/8] Implantando dotfiles base em $TARGET_HOME/.config..."
+echo "-> [2/8] Selecionando aplicativos e configurações personalizadas..."
+MANIFEST_FILE="$SCRIPT_DIR/configs/custom-apps.conf"
+TMP_INSTALL_SEL=$(mktemp)
+
+declare -A APP_PKGS
+declare -A APP_DESCS
+
+if [ -f "$MANIFEST_FILE" ]; then
+    INSTALL_CHECKLIST=()
+
+    while IFS=':' read -r f_name p_name d_desc d_status; do
+        [[ "$f_name" =~ ^#.*$ || -z "$f_name" ]] && continue
+        APP_PKGS["$f_name"]="$p_name"
+        APP_DESCS["$f_name"]="$d_desc"
+        INSTALL_CHECKLIST+=("$f_name" "$d_desc" "ON")
+    done < "$MANIFEST_FILE"
+
+    if [ "$1" == "--batch" ] || [ "$2" == "--batch" ] || [ "$1" == "--all" ] || [ "$2" == "--all" ] || [ ! -t 0 ]; then
+        echo "   Modo não-interativo ativo: instalando todos os aplicativos do pacote."
+        for k in "${!APP_PKGS[@]}"; do
+            echo "$k" >> "$TMP_INSTALL_SEL"
+        done
+    else
+        if ! prompt_checklist "Instalação de Aplicativos Opcionais" \
+            "Selecione os aplicativos e configurações que deseja instalar nesta máquina:" \
+            "$TMP_INSTALL_SEL" \
+            "${INSTALL_CHECKLIST[@]}"; then
+            echo ""
+            echo -e "\033[1;33m-> Instalação cancelada pelo usuário (ESC/Q). Nenhuma alteração foi realizada nos dotfiles.\033[0m"
+            rm -f "$TMP_INSTALL_SEL"
+            exit 0
+        fi
+    fi
+fi
+
+# 3. Implantação de Dotfiles Base em ~/.config
+echo ""
+echo "-> [3/8] Implantando dotfiles base em $TARGET_HOME/.config..."
 mkdir -p "$TARGET_HOME/.config"
 
 # Copiar dotfiles do sistema, ignorando pastas de apps opcionais
@@ -107,9 +144,9 @@ else
     sed -i "s|MONITOR2 = .*|MONITOR2 = \"\"|g" "$TARGET_HOME/.config/hypr/config/variables.lua" 2>/dev/null || true
 fi
 
-# 3. Implantação de Ícones, Temas, Wallpaper e Estado do Noctalia (com Dock 100% ativa)
+# 4. Implantação de Ícones, Temas, Wallpaper e Estado do Noctalia (com Dock 100% ativa)
 echo ""
-echo "-> [3/8] Instalando cursores, esquemas de cores, wallpaper e estado do Noctalia..."
+echo "-> [4/8] Instalando cursores, esquemas de cores, wallpaper e estado do Noctalia..."
 mkdir -p "$TARGET_HOME/.local/share/icons"
 mkdir -p "$TARGET_HOME/.local/share/color-schemes"
 mkdir -p "$TARGET_HOME/.local/share/wallpapers"
@@ -138,6 +175,7 @@ fi
 if [ -d "$SCRIPT_DIR/state/noctalia" ]; then
     echo "Restaurando estado e personalizações do Noctalia (dock, barra e paleta)..."
     cp -r "$SCRIPT_DIR/state/noctalia/"* "$TARGET_HOME/.local/state/noctalia/"
+
     # Ajustar caminhos absolutos do usuário no settings.toml e state.toml
     sed -i "s|/home/[^/]*|$TARGET_HOME|g" "$TARGET_HOME/.local/state/noctalia/settings.toml" 2>/dev/null || true
     sed -i "s|/home/[^/]*|$TARGET_HOME|g" "$TARGET_HOME/.local/state/noctalia/state.toml" 2>/dev/null || true
@@ -161,36 +199,10 @@ if [ -d "$SCRIPT_DIR/bin" ]; then
     chmod +x "$TARGET_HOME/.local/bin/"* 2>/dev/null || true
 fi
 
-# 4. Seleção Interativa e Instalação de Aplicativos Opcionais
+# 5. Instalação e Configuração dos Aplicativos Selecionados
 echo ""
-echo "-> [4/8] Instalando aplicativos e configurações personalizadas..."
-MANIFEST_FILE="$SCRIPT_DIR/configs/custom-apps.conf"
-
-if [ -f "$MANIFEST_FILE" ]; then
-    INSTALL_CHECKLIST=()
-    declare -A APP_PKGS
-    declare -A APP_DESCS
-
-    while IFS=':' read -r f_name p_name d_desc d_status; do
-        [[ "$f_name" =~ ^#.*$ || -z "$f_name" ]] && continue
-        APP_PKGS["$f_name"]="$p_name"
-        APP_DESCS["$f_name"]="$d_desc"
-        INSTALL_CHECKLIST+=("$f_name" "$d_desc" "ON")
-    done < "$MANIFEST_FILE"
-
-    TMP_INSTALL_SEL=$(mktemp)
-    if [ "$1" == "--batch" ] || [ "$2" == "--batch" ] || [ "$1" == "--all" ] || [ "$2" == "--all" ] || [ ! -t 0 ]; then
-        echo "   Modo não-interativo ativo: instalando todos os aplicativos do pacote."
-        for k in "${!APP_PKGS[@]}"; do
-            echo "$k" >> "$TMP_INSTALL_SEL"
-        done
-    else
-        prompt_checklist "Instalação de Aplicativos Opcionais" \
-            "Selecione com [ESPAÇO] os aplicativos e configurações que deseja instalar nesta máquina:\n(Pressione ENTER para confirmar)" \
-            "$TMP_INSTALL_SEL" \
-            "${INSTALL_CHECKLIST[@]}"
-    fi
-
+echo "-> [5/8] Instalando aplicativos opcionais selecionados e restaurando dados..."
+if [ -s "$TMP_INSTALL_SEL" ]; then
     PACMAN_TO_INSTALL=()
     AUR_TO_INSTALL=()
 
@@ -217,7 +229,6 @@ if [ -f "$MANIFEST_FILE" ]; then
             sed -i "s|/home/[^/]*|$TARGET_HOME|g" "$TARGET_HOME/.config/$app_folder/"*.json "$TARGET_HOME/.config/$app_folder/"*.conf 2>/dev/null || true
         fi
     done < "$TMP_INSTALL_SEL"
-    rm -f "$TMP_INSTALL_SEL"
 
     # Instalação dos pacotes pacman acumulados
     if [ ${#PACMAN_TO_INSTALL[@]} -gt 0 ]; then
@@ -233,10 +244,11 @@ if [ -f "$MANIFEST_FILE" ]; then
         fi
     fi
 fi
+rm -f "$TMP_INSTALL_SEL"
 
-# 5. Integridade do KDE Plasma e Configuração do Dolphin
+# 6. Integridade do KDE Plasma e Configuração do Dolphin
 echo ""
-echo "-> [5/8] Garantindo integridade do KDE Plasma e tema do Dolphin..."
+echo "-> [6/8] Garantindo integridade do KDE Plasma e tema do Dolphin..."
 rm -f "$TARGET_HOME/.local/share/applications/org.kde.dolphin.desktop" 2>/dev/null || true
 
 if command -v update-desktop-database >/dev/null 2>&1; then
@@ -257,9 +269,9 @@ else
     echo -e "[UiSettings]\nColorScheme=Noctalia" > "$TARGET_HOME/.config/dolphinrc"
 fi
 
-# 6. Configurações de Rede: KDE Connect, AudioRelay e Firewall
+# 7. Configurações de Rede: KDE Connect, AudioRelay e Firewall / GPU
 echo ""
-echo "-> [6/8] Configurando KDE Connect e AudioRelay..."
+echo "-> [7/8] Configurando KDE Connect, AudioRelay e GPU (Early KMS)..."
 if command -v ufw >/dev/null 2>&1; then
     echo "Liberando portas no firewall UFW..."
     sudo ufw allow 1714:1764/udp comment "KDE Connect" 2>/dev/null || true
@@ -279,9 +291,7 @@ if [ -f "$TARGET_HOME/.config/fish/config.fish" ]; then
     fi
 fi
 
-# 7. Detecção de GPU e Prevenção de Flicker (Early KMS)
-echo ""
-echo "-> [7/8] Detectando GPU para configurar Early KMS e eliminar piscadas de tela..."
+# Detecção de GPU e Prevenção de Flicker (Early KMS)
 if [ -f /etc/mkinitcpio.conf ]; then
     GPU_MODULE=""
     if lspci -k 2>/dev/null | grep -i -E "(vga|3d|display)" | grep -i "amdgpu" >/dev/null; then

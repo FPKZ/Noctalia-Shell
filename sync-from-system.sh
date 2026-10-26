@@ -29,52 +29,8 @@ echo "  Destino: $SCRIPT_DIR"
 echo "=========================================================="
 echo ""
 
-# 1. Sincronizar Dotfiles Base (~/.config)
-echo "-> [1/7] Sincronizando dotfiles base do sistema em $USER_HOME/.config..."
-mkdir -p "$SCRIPT_DIR/configs"
-
-# Hyprland
-if [ -d "$USER_HOME/.config/hypr" ]; then
-    mkdir -p "$SCRIPT_DIR/configs/hypr"
-    cp -r "$USER_HOME/.config/hypr/"* "$SCRIPT_DIR/configs/hypr/"
-    if [ -f "$SCRIPT_DIR/configs/hypr/config/monitors.lua" ]; then
-        if ! grep -q "output = \"\"" "$SCRIPT_DIR/configs/hypr/config/monitors.lua"; then
-            echo "   (Aviso: mantendo regra universal de monitores para compatibilidade plug-and-play)"
-        fi
-    fi
-fi
-
-# Noctalia config
-if [ -d "$USER_HOME/.config/noctalia" ]; then
-    mkdir -p "$SCRIPT_DIR/configs/noctalia"
-    cp -r "$USER_HOME/.config/noctalia/"* "$SCRIPT_DIR/configs/noctalia/"
-fi
-
-# Kitty, Qt6ct, Swash, UWSM
-for dir in kitty qt6ct swash uwsm; do
-    if [ -d "$USER_HOME/.config/$dir" ]; then
-        mkdir -p "$SCRIPT_DIR/configs/$dir"
-        cp -r "$USER_HOME/.config/$dir/"* "$SCRIPT_DIR/configs/$dir/"
-    fi
-done
-
-# GTK 3.0 e 4.0 (Apenas CSS do tema)
-for dir in gtk-3.0 gtk-4.0; do
-    if [ -d "$USER_HOME/.config/$dir" ]; then
-        mkdir -p "$SCRIPT_DIR/configs/$dir"
-        cp "$USER_HOME/.config/$dir/"*.css "$SCRIPT_DIR/configs/$dir/" 2>/dev/null || true
-    fi
-done
-
-# Systemd User services
-if [ -f "$USER_HOME/.config/systemd/user/kdeconnect.service" ]; then
-    mkdir -p "$SCRIPT_DIR/configs/systemd/user"
-    cp "$USER_HOME/.config/systemd/user/kdeconnect.service" "$SCRIPT_DIR/configs/systemd/user/"
-fi
-
-# 2. Seleção e Sincronização Seletiva de Aplicativos Pessoais
-echo ""
-echo "-> [2/7] Gerenciando aplicativos e configurações personalizadas..."
+# 1. Seleção e Filtro de Aplicativos Pessoais (Executado antes de qualquer alteração)
+echo "-> [1/7] Selecionando aplicativos e configurações personalizadas..."
 mkdir -p "$SCRIPT_DIR/configs/apps"
 MANIFEST_FILE="$SCRIPT_DIR/configs/custom-apps.conf"
 
@@ -130,13 +86,64 @@ if [ "$1" == "--batch" ] || [ "$2" == "--batch" ] || [ "$1" == "--all" ] || [ "$
         done
     fi
 else
-    prompt_checklist "Sincronização Seletiva de Apps" \
-        "Marque com [ESPAÇO] os aplicativos e configurações que deseja exportar:\n(Use TAB para navegar, ESPAÇO para marcar e ENTER para confirmar)" \
+    if ! prompt_checklist "Sincronização Seletiva de Apps" \
+        "Selecione os aplicativos e configurações que deseja exportar:" \
         "$TMP_SELECTED" \
-        "${CHECKLIST_ITEMS[@]}"
+        "${CHECKLIST_ITEMS[@]}"; then
+        echo ""
+        echo -e "\033[1;33m-> Sincronização cancelada pelo usuário (ESC/Q). Nenhuma alteração foi realizada.\033[0m"
+        rm -f "$TMP_SELECTED"
+        exit 0
+    fi
 fi
 
-# Criar novo manifesto com os selecionados
+# 2. Sincronizar Dotfiles Base (~/.config)
+echo ""
+echo "-> [2/7] Sincronizando dotfiles base do sistema em $USER_HOME/.config..."
+mkdir -p "$SCRIPT_DIR/configs"
+
+# Hyprland
+if [ -d "$USER_HOME/.config/hypr" ]; then
+    mkdir -p "$SCRIPT_DIR/configs/hypr"
+    cp -r "$USER_HOME/.config/hypr/"* "$SCRIPT_DIR/configs/hypr/"
+    if [ -f "$SCRIPT_DIR/configs/hypr/config/monitors.lua" ]; then
+        if ! grep -q "output = \"\"" "$SCRIPT_DIR/configs/hypr/config/monitors.lua"; then
+            echo "   (Aviso: mantendo regra universal de monitores para compatibilidade plug-and-play)"
+        fi
+    fi
+fi
+
+# Noctalia config
+if [ -d "$USER_HOME/.config/noctalia" ]; then
+    mkdir -p "$SCRIPT_DIR/configs/noctalia"
+    cp -r "$USER_HOME/.config/noctalia/"* "$SCRIPT_DIR/configs/noctalia/"
+fi
+
+# Kitty, Qt6ct, Swash, UWSM
+for dir in kitty qt6ct swash uwsm; do
+    if [ -d "$USER_HOME/.config/$dir" ]; then
+        mkdir -p "$SCRIPT_DIR/configs/$dir"
+        cp -r "$USER_HOME/.config/$dir/"* "$SCRIPT_DIR/configs/$dir/"
+    fi
+done
+
+# GTK 3.0 e 4.0 (Apenas CSS do tema)
+for dir in gtk-3.0 gtk-4.0; do
+    if [ -d "$USER_HOME/.config/$dir" ]; then
+        mkdir -p "$SCRIPT_DIR/configs/$dir"
+        cp "$USER_HOME/.config/$dir/"*.css "$SCRIPT_DIR/configs/$dir/" 2>/dev/null || true
+    fi
+done
+
+# Systemd User services
+if [ -f "$USER_HOME/.config/systemd/user/kdeconnect.service" ]; then
+    mkdir -p "$SCRIPT_DIR/configs/systemd/user"
+    cp "$USER_HOME/.config/systemd/user/kdeconnect.service" "$SCRIPT_DIR/configs/systemd/user/"
+fi
+
+# 3. Exportar Aplicativos Selecionados e Atualizar Manifesto
+echo ""
+echo "-> [3/7] Exportando aplicativos selecionados e atualizando manifesto..."
 echo "# ==============================================================================" > "$MANIFEST_FILE"
 echo "# custom-apps.conf: Aplicativos e Configurações Pessoais Exportados" >> "$MANIFEST_FILE"
 echo "# Formato: FOLDER_NAME:PACKAGE_NAME:DESCRIPTION:DEFAULT_STATUS" >> "$MANIFEST_FILE"
@@ -181,9 +188,9 @@ for existing_app in "$SCRIPT_DIR/configs/apps/"*; do
     fi
 done
 
-# 3. Sincronizar Estado e Estilização do Noctalia (~/.local/state/noctalia)
+# 4. Sincronizar Estado e Estilização do Noctalia (~/.local/state/noctalia)
 echo ""
-echo "-> [3/7] Sincronizando estado, dock, painéis e paletas do Noctalia..."
+echo "-> [4/7] Sincronizando estado, dock, painéis e paletas do Noctalia..."
 mkdir -p "$SCRIPT_DIR/state/noctalia"
 if [ -d "$USER_HOME/.local/state/noctalia" ]; then
     rsync -a \
@@ -202,9 +209,9 @@ if [ -f "$USER_HOME/.local/state/noctalia/settings.toml" ]; then
     sync_noctalia_dock "$USER_HOME/.local/state/noctalia/settings.toml" "$SCRIPT_DIR/configs/noctalia/config.toml"
 fi
 
-# 4. Sincronizar Wallpaper Ativo
+# 5. Sincronizar Wallpaper Ativo
 echo ""
-echo "-> [4/7] Sincronizando wallpaper do sistema..."
+echo "-> [5/7] Sincronizando wallpaper do sistema..."
 mkdir -p "$SCRIPT_DIR/wallpapers"
 WP_PATH=""
 if [ -f "$USER_HOME/.local/state/noctalia/settings.toml" ]; then
@@ -218,9 +225,9 @@ elif [ -f "$USER_HOME/Imagens/wp15566549.jpg" ]; then
     cp "$USER_HOME/Imagens/wp15566549.jpg" "$SCRIPT_DIR/wallpapers/wp15566549.jpg"
 fi
 
-# 5. Sincronizar Assets (Cursores, Esquemas de Cores e Scripts)
+# 6. Sincronizar Assets (Cursores, Esquemas de Cores e Scripts)
 echo ""
-echo "-> [5/7] Sincronizando cursores, esquemas de cores e utilitários..."
+echo "-> [6/7] Sincronizando cursores, esquemas de cores e utilitários..."
 if [ -d "$USER_HOME/.local/share/icons/Bibata-Modern-Ice" ]; then
     mkdir -p "$SCRIPT_DIR/icons"
     cp -r "$USER_HOME/.local/share/icons/Bibata-Modern-Ice" "$SCRIPT_DIR/icons/"
@@ -237,9 +244,9 @@ if [ -f "$USER_HOME/.local/bin/setup-audiorelay.sh" ]; then
     chmod +x "$SCRIPT_DIR/bin/setup-audiorelay.sh"
 fi
 
-# 6. Validação de Integridade
+# 7. Validação de Integridade e Pacote de Release
 echo ""
-echo "-> [6/7] Validando sintaxe das configurações sincronizadas..."
+echo "-> [7/7] Validando integridade e atualizando pacote de release..."
 if command -v luac >/dev/null 2>&1; then
     luac -p "$SCRIPT_DIR/configs/hypr/"*.lua "$SCRIPT_DIR/configs/hypr/config/"*.lua
     echo "   Sintaxe Lua 100% válida!"
@@ -258,9 +265,6 @@ if command -v bash >/dev/null 2>&1; then
     echo "   Scripts Bash 100% válidos!"
 fi
 
-# 7. Reconstruir Tarball de Release Local
-echo ""
-echo "-> [7/7] Atualizando pacote portátil de release..."
 "$SCRIPT_DIR/build-release.sh"
 cp "$SCRIPT_DIR/noctalia-cachyos-portable.tar.gz" "$USER_HOME/noctalia-cachyos-portable.tar.gz" 2>/dev/null || true
 
