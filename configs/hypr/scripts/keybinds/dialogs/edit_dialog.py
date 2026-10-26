@@ -4,14 +4,15 @@ Princípio da Segregação de Interfaces (ISP) e Responsabilidade Única (SRP).
 """
 import os
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QKeyEvent, QKeySequence
+from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QLabel, QLineEdit, QCheckBox, QPushButton, QMessageBox
+    QLabel, QLineEdit, QPushButton, QMessageBox
 )
 
 from ..config import VARIABLES_LUA
 from ..editor import open_file_in_editor
+from ..widgets.key_recorder import KeySequenceRecorder
 
 # Importação defensiva das funções do keybinds-parser
 try:
@@ -30,65 +31,8 @@ except ImportError:
     delete_hypr_bind_in_file = parser_mod.delete_hypr_bind_in_file
     update_kitty_bind = parser_mod.update_kitty_bind
 
-class KeyCaptureLineEdit(QLineEdit):
-    """Campo de texto inteligente que grava diretamente a tecla pressionada sem fechar o diálogo."""
-    def __init__(self, parent_dialog=None):
-        super().__init__(parent_dialog)
-        self.parent_dialog = parent_dialog
-
-    def keyPressEvent(self, event: QKeyEvent):
-        key = event.key()
-
-        # Teclas modificadoras sozinhas
-        if key in (Qt.Key.Key_Super_L, Qt.Key.Key_Super_R):
-            if self.parent_dialog:
-                self.parent_dialog.chk_super.setChecked(True)
-            return
-        elif key in (Qt.Key.Key_Control, Qt.Key.Key_Meta):
-            if self.parent_dialog:
-                self.parent_dialog.chk_ctrl.setChecked(True)
-            return
-        elif key == Qt.Key.Key_Shift:
-            if self.parent_dialog:
-                self.parent_dialog.chk_shift.setChecked(True)
-            return
-        elif key == Qt.Key.Key_Alt:
-            if self.parent_dialog:
-                self.parent_dialog.chk_alt.setChecked(True)
-            return
-
-        # Captura de teclas especiais sem fechar o diálogo no Escape
-        if key == Qt.Key.Key_Escape:
-            self.setText("Esc")
-            event.accept()
-            return
-        elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-            self.setText("Enter")
-            event.accept()
-            return
-        elif key == Qt.Key.Key_Space:
-            self.setText("Space")
-            event.accept()
-            return
-        elif key == Qt.Key.Key_Tab:
-            self.setText("Tab")
-            event.accept()
-            return
-        elif key == Qt.Key.Key_Backspace:
-            self.setText("")
-            event.accept()
-            return
-
-        seq_text = QKeySequence(key).toString()
-        if seq_text:
-            self.setText(seq_text.upper())
-            event.accept()
-            return
-
-        super().keyPressEvent(event)
-
 class EditShortcutDialog(QDialog):
-    """Modal para Editar um Atalho Específico e sua Linha de Origem."""
+    """Modal para Editar um Atalho Específico e sua Linha de Origem com foco em teclado."""
     def __init__(self, bind_item: dict, theme: dict, parent=None):
         super().__init__(parent)
         self.setObjectName("EditShortcutDialog")
@@ -100,11 +44,10 @@ class EditShortcutDialog(QDialog):
         self.setup_ui()
 
     def keyPressEvent(self, event: QKeyEvent):
-        # Impedir fechamento involuntário por Esc se o foco estiver no campo de captura de tecla
+        # Quando NÃO estiver gravando atalho, ESC fecha normalmente a janela
         if event.key() == Qt.Key.Key_Escape:
-            if self.key_input.hasFocus():
-                self.key_input.setText("Esc")
-                event.accept()
+            if not self.key_recorder.is_recording:
+                self.reject()
                 return
         super().keyPressEvent(event)
 
@@ -133,68 +76,34 @@ class EditShortcutDialog(QDialog):
         )
         layout.addWidget(lbl_origin)
 
+        # 1. Gravador Inteligente de Atalho
         lbl_mod = QLabel("1. Combinação de Teclas:", self)
         lbl_mod.setObjectName("SectionLabel")
         layout.addWidget(lbl_mod)
 
-        # Checkbox para uso da tecla Super avulsa (soltar)
-        self.chk_standalone_super = QCheckBox("🎯 Apenas a tecla Super (soltar)", self)
-        self.chk_standalone_super.setToolTip("Dispara a ação ao pressionar e soltar a tecla Super isolada.")
-        self.chk_standalone_super.toggled.connect(self.on_standalone_super_toggled)
-        layout.addWidget(self.chk_standalone_super)
+        self.key_recorder = KeySequenceRecorder(
+            initial_combo=self.bind_item.get('key', ''),
+            theme=self.theme,
+            parent=self
+        )
+        self.key_recorder.keySequenceChanged.connect(self.update_preview)
+        layout.addWidget(self.key_recorder)
 
-        mod_box = QHBoxLayout()
-        self.chk_super = QCheckBox("Super", self)
-        self.chk_ctrl = QCheckBox("Ctrl", self)
-        self.chk_shift = QCheckBox("Shift", self)
-        self.chk_alt = QCheckBox("Alt", self)
-
-        cur_key = self.bind_item['key']
-        is_standalone = cur_key.strip() in ("Super (Soltar)", "SUPER_L", "Super (Ao Soltar)")
-        cur_parts = [p.strip().lower() for p in cur_key.split("+")]
-
-        self.chk_super.setChecked("super" in cur_parts and not is_standalone)
-        self.chk_ctrl.setChecked(("ctrl" in cur_parts or "control" in cur_parts) and not is_standalone)
-        self.chk_shift.setChecked("shift" in cur_parts and not is_standalone)
-        self.chk_alt.setChecked("alt" in cur_parts and not is_standalone)
-
-        main_key = ""
-        if is_standalone:
-            main_key = "SUPER_L"
-        else:
-            for p in cur_key.split("+"):
-                p_strip = p.strip()
-                if p_strip.lower() not in ("super", "ctrl", "control", "shift", "alt"):
-                    main_key = p_strip
-                    break
-
-        for c in (self.chk_super, self.chk_ctrl, self.chk_shift, self.chk_alt):
-            c.stateChanged.connect(self.update_preview)
-            mod_box.addWidget(c)
-        mod_box.addStretch()
-        layout.addLayout(mod_box)
-
+        # 2. Descrição e Ação
         grid = QGridLayout()
         grid.setSpacing(10)
 
-        grid.addWidget(QLabel("Tecla Principal:"), 0, 0)
-        self.key_input = KeyCaptureLineEdit(self)
-        self.key_input.setText(main_key)
-        self.key_input.setPlaceholderText("Pressione qualquer tecla (ex: Esc, Q, Return, Space...)")
-        self.key_input.textChanged.connect(self.update_preview)
-        grid.addWidget(self.key_input, 0, 1)
-
-        grid.addWidget(QLabel("Descrição da Ação:"), 1, 0)
+        grid.addWidget(QLabel("Descrição da Ação:"), 0, 0)
         self.desc_input = QLineEdit(self)
-        self.desc_input.setText(self.bind_item['desc'])
+        self.desc_input.setText(self.bind_item.get('desc', ''))
         self.desc_input.textChanged.connect(self.update_preview)
-        grid.addWidget(self.desc_input, 1, 1)
+        grid.addWidget(self.desc_input, 0, 1)
 
-        grid.addWidget(QLabel("Comando / Ação:"), 2, 0)
+        grid.addWidget(QLabel("Comando / Ação:"), 1, 0)
         self.action_input = QLineEdit(self)
         self.action_input.setText(self.bind_item.get("raw_action", ""))
         self.action_input.textChanged.connect(self.update_preview)
-        grid.addWidget(self.action_input, 2, 1)
+        grid.addWidget(self.action_input, 1, 1)
 
         layout.addLayout(grid)
 
@@ -236,36 +145,17 @@ class EditShortcutDialog(QDialog):
 
         layout.addLayout(btn_box)
 
-        if is_standalone:
-            self.chk_standalone_super.setChecked(True)
-            self.on_standalone_super_toggled(True)
-
-        self.update_preview()
-
-    def on_standalone_super_toggled(self, checked: bool):
-        for c in (self.chk_super, self.chk_ctrl, self.chk_shift, self.chk_alt):
-            c.setEnabled(not checked)
-            if checked:
-                c.setChecked(False)
-        self.key_input.setEnabled(not checked)
-        if checked:
-            self.key_input.setText("SUPER_L")
-        else:
-            if self.key_input.text() == "SUPER_L":
-                self.key_input.setText("")
+        # Focar inicialmente no botão de gravar para facilitar alteração
+        self.key_recorder.btn_record.setFocus()
         self.update_preview()
 
     def get_readable_combo(self) -> str:
-        if self.chk_standalone_super.isChecked():
-            return "Super (Soltar)"
-        mods = []
-        if self.chk_super.isChecked(): mods.append("Super")
-        if self.chk_ctrl.isChecked(): mods.append("Ctrl")
-        if self.chk_shift.isChecked(): mods.append("Shift")
-        if self.chk_alt.isChecked(): mods.append("Alt")
-        key = self.key_input.text().strip() or "X"
-        mods.append(key)
-        return " + ".join(mods)
+        combo = self.key_recorder.get_combo()
+        return combo if combo else self.bind_item.get('key', 'Super + X')
+
+    def is_release_bind(self) -> bool:
+        combo = self.get_readable_combo().lower()
+        return "soltar" in combo or combo in ("super", "super_l")
 
     def update_preview(self):
         readable = self.get_readable_combo()
@@ -275,7 +165,7 @@ class EditShortcutDialog(QDialog):
         stype = self.bind_item.get("source_type")
 
         if stype in ("hyprland", "custom"):
-            if self.chk_standalone_super.isChecked() and "release" not in action:
+            if self.is_release_bind() and "release" not in action:
                 prev = f"-- {desc}\nhl.bind({lua_key}, {action}, {{ release = true }})"
             else:
                 prev = f"-- {desc}\nhl.bind({lua_key}, {action})"

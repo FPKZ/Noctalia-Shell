@@ -1,11 +1,12 @@
 import unittest
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QEvent
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import QApplication
 from keybinds.config import DEFAULT_THEME
 from keybinds.widgets.search_input import SearchLineEdit
-from keybinds.dialogs.add_dialog import AddShortcutDialog, KeyCaptureLineEdit as AddKeyCapture
-from keybinds.dialogs.edit_dialog import EditShortcutDialog, KeyCaptureLineEdit as EditKeyCapture
+from keybinds.widgets.key_recorder import KeySequenceRecorder
+from keybinds.dialogs.add_dialog import AddShortcutDialog
+from keybinds.dialogs.edit_dialog import EditShortcutDialog
 
 # QApplication mínima para permitir testes de widgets Qt
 app = QApplication.instance() or QApplication([])
@@ -32,20 +33,62 @@ class TestWidgetsAndDialogs(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(cycled, [1, -1])
 
-    def test_add_shortcut_dialog_instantiation(self):
+    def test_key_recorder_combo_and_auto_release(self):
+        rec = KeySequenceRecorder(initial_combo="Super + Return", theme=DEFAULT_THEME)
+        self.assertEqual(rec.get_combo(), "Super + Return")
+
+        # Iniciar gravação
+        rec.start_recording()
+        self.assertTrue(rec.is_recording)
+
+        # 1. Pressionar Super
+        e1 = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Super_L, Qt.KeyboardModifier.MetaModifier)
+        rec.eventFilter(rec, e1)
+        self.assertIn("Super", rec.recorded_keys)
+        self.assertTrue(rec.is_recording)
+
+        # 2. Pressionar Esc mantendo Super
+        e2 = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.MetaModifier)
+        rec.eventFilter(rec, e2)
+        self.assertIn("Esc", rec.recorded_keys)
+        self.assertTrue(rec.is_recording)
+
+        # 3. Soltar Esc
+        e3 = QKeyEvent(QKeyEvent.Type.KeyRelease, Qt.Key.Key_Escape, Qt.KeyboardModifier.MetaModifier)
+        rec.eventFilter(rec, e3)
+        self.assertTrue(rec.is_recording)  # Ainda segurando Super
+
+        # 4. Soltar Super
+        e4 = QKeyEvent(QKeyEvent.Type.KeyRelease, Qt.Key.Key_Super_L, Qt.KeyboardModifier.NoModifier)
+        rec.eventFilter(rec, e4)
+        # Ao soltar todas as teclas, deve finalizar automaticamente!
+        self.assertFalse(rec.is_recording)
+        self.assertEqual(rec.get_combo(), "Super + Esc")
+
+    def test_key_recorder_standalone_super(self):
+        rec = KeySequenceRecorder(theme=DEFAULT_THEME)
+        rec.start_recording()
+
+        # Pressionar Super isolado
+        e1 = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Super_L, Qt.KeyboardModifier.MetaModifier)
+        rec.eventFilter(rec, e1)
+        # Soltar Super isolado
+        e2 = QKeyEvent(QKeyEvent.Type.KeyRelease, Qt.Key.Key_Super_L, Qt.KeyboardModifier.NoModifier)
+        rec.eventFilter(rec, e2)
+
+        self.assertFalse(rec.is_recording)
+        self.assertEqual(rec.get_combo(), "Super (Soltar)")
+
+    def test_add_shortcut_dialog_instantiation_and_recording(self):
         dialog = AddShortcutDialog(theme=DEFAULT_THEME)
         self.assertIsNotNone(dialog)
         combo = dialog.get_readable_combo()
         self.assertIn("Super", combo)
-        action_code = dialog.get_action_code()
-        self.assertIn("hl.dsp.exec_cmd", action_code)
 
-    def test_add_shortcut_standalone_super(self):
-        dialog = AddShortcutDialog(theme=DEFAULT_THEME)
-        dialog.chk_standalone_super.setChecked(True)
+        # Gravar Super avulso
+        dialog.key_recorder.set_combo("Super (Soltar)")
         self.assertTrue(dialog.is_release_bind())
-        self.assertEqual(dialog.get_readable_combo(), "Super (Soltar)")
-        self.assertEqual(dialog.get_combo_string(), '"SUPER_L"')
+        self.assertEqual(dialog.get_combo_string(), 'mainMod .. " + SUPER_L"')
 
     def test_add_shortcut_noctalia_autodetect(self):
         dialog = AddShortcutDialog(theme=DEFAULT_THEME)
@@ -60,13 +103,6 @@ class TestWidgetsAndDialogs(unittest.TestCase):
         action_code = dialog.get_action_code()
         self.assertEqual(action_code, 'hl.dsp.exec_cmd("noctalia msg panel-toggle launcher")')
 
-    def test_key_capture_line_edit_escape(self):
-        edit = AddKeyCapture()
-        # Simular pressão da tecla Escape
-        event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier)
-        edit.keyPressEvent(event)
-        self.assertEqual(edit.text(), "Esc")
-
     def test_edit_shortcut_dialog_instantiation(self):
         sample_item = {
             "key": "Super + Return",
@@ -78,8 +114,7 @@ class TestWidgetsAndDialogs(unittest.TestCase):
         }
         dialog = EditShortcutDialog(bind_item=sample_item, theme=DEFAULT_THEME)
         self.assertIsNotNone(dialog)
-        self.assertTrue(dialog.chk_super.isChecked())
-        self.assertEqual(dialog.key_input.text(), "Return")
+        self.assertEqual(dialog.key_recorder.get_combo(), "Super + Return")
         self.assertEqual(dialog.desc_input.text(), "Abrir Terminal Kitty")
 
     def test_edit_shortcut_standalone_super(self):
@@ -92,8 +127,24 @@ class TestWidgetsAndDialogs(unittest.TestCase):
             "line_number": 5
         }
         dialog = EditShortcutDialog(bind_item=sample_standalone, theme=DEFAULT_THEME)
-        self.assertTrue(dialog.chk_standalone_super.isChecked())
-        self.assertEqual(dialog.get_readable_combo(), "Super (Soltar)")
+        self.assertEqual(dialog.key_recorder.get_combo(), "Super (Soltar)")
+        self.assertTrue(dialog.is_release_bind())
+
+    def test_escape_behavior_outside_and_inside_recording(self):
+        dialog = AddShortcutDialog(theme=DEFAULT_THEME)
+        
+        # 1. Quando NÃO está gravando, ESC aciona reject()
+        rejected = []
+        dialog.reject = lambda: rejected.append(True)
+        e_esc = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier)
+        dialog.keyPressEvent(e_esc)
+        self.assertEqual(rejected, [True])
+
+        # 2. Quando ESTÁ gravando, ESC é absorvido pelo gravador e NÃO aciona reject()
+        dialog.key_recorder.start_recording()
+        dialog.key_recorder.eventFilter(dialog, e_esc)
+        self.assertIn("Esc", dialog.key_recorder.recorded_keys)
+        self.assertEqual(rejected, [True])  # Continua 1, não aumentou
 
 if __name__ == "__main__":
     unittest.main()

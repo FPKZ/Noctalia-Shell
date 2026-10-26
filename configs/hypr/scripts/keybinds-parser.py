@@ -139,9 +139,10 @@ ACTION_MAP = {
 }
 
 def clean_key_name(k):
+    k = k.replace('mainMod .. " + SUPER_L"', 'Super (Soltar)')
+    k = k.replace('SUPER_L', 'Super (Soltar)')
     k = k.replace('mainMod .. " + ', 'Super + ')
     k = k.replace('mainMod', 'Super')
-    k = k.replace('SUPER_L', 'Super (Soltar)')
     k = k.replace('"', '').strip()
     k = re.sub(r'\s*\+\s*', ' + ', k)
     k = k.replace('Return', 'Enter')
@@ -159,7 +160,7 @@ def readable_key_to_lua(readable_key):
     """Converte formato legível (ex: Super + Shift + Q) para código Lua do binds.lua."""
     rk_clean = readable_key.strip()
     if rk_clean in ("Super", "Super (Soltar)", "Super (Ao Soltar)", "SUPER_L"):
-        return '"SUPER_L"'
+        return 'mainMod .. " + SUPER_L"'
 
     parts = [p.strip() for p in readable_key.split("+")]
     lua_parts = []
@@ -181,12 +182,12 @@ def readable_key_to_lua(readable_key):
             lua_parts.append(f'"{p}"')
 
     if len(lua_parts) == 1 and lua_parts[0] == "mainMod":
-        return '"SUPER_L"'
+        return 'mainMod .. " + SUPER_L"'
 
     if lua_parts[0] == "mainMod":
         rest = " + ".join([p.strip('"') for p in lua_parts[1:] if p.strip('"') != "mainMod"])
         if not rest:
-            return '"SUPER_L"'
+            return 'mainMod .. " + SUPER_L"'
         return f'mainMod .. " + {rest}"'
     else:
         full = " + ".join([p.strip('"') for p in lua_parts])
@@ -498,7 +499,7 @@ def update_hypr_bind_in_file(filepath, line_num, new_readable_key, new_action=No
     old_action_full = parts[1].strip()
     new_lua_key = readable_key_to_lua(new_readable_key)
 
-    is_release = (new_lua_key == '"SUPER_L"' or "release" in old_action_full or "release" in (new_action or ""))
+    is_release = ("SUPER_L" in new_lua_key or "release" in old_action_full or "release" in (new_action or ""))
     target_action = new_action.strip() if new_action else old_action_full
     if is_release and "release" not in target_action:
         target_action = f"{target_action}, {{ release = true }}"

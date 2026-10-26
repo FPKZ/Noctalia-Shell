@@ -6,13 +6,14 @@ import os
 import re
 import subprocess
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QKeyEvent, QKeySequence
+from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QLabel, QLineEdit, QComboBox, QCheckBox, QPushButton, QMessageBox
+    QLabel, QLineEdit, QComboBox, QPushButton, QMessageBox
 )
 
 from ..config import CUSTOM_BINDS_LUA
+from ..widgets.key_recorder import KeySequenceRecorder
 
 # Importação defensiva das funções do keybinds-parser
 try:
@@ -25,73 +26,24 @@ except ImportError:
     spec.loader.exec_module(parser_mod)
     readable_key_to_lua = parser_mod.readable_key_to_lua
 
-class KeyCaptureLineEdit(QLineEdit):
-    """Campo de texto inteligente que grava diretamente a tecla pressionada sem fechar o diálogo."""
-    def __init__(self, parent_dialog=None):
-        super().__init__(parent_dialog)
-        self.parent_dialog = parent_dialog
-
-    def keyPressEvent(self, event: QKeyEvent):
-        key = event.key()
-
-        # Teclas modificadoras sozinhas
-        if key in (Qt.Key.Key_Super_L, Qt.Key.Key_Super_R):
-            if self.parent_dialog:
-                self.parent_dialog.chk_super.setChecked(True)
-            return
-        elif key in (Qt.Key.Key_Control, Qt.Key.Key_Meta):
-            if self.parent_dialog:
-                self.parent_dialog.chk_ctrl.setChecked(True)
-            return
-        elif key == Qt.Key.Key_Shift:
-            if self.parent_dialog:
-                self.parent_dialog.chk_shift.setChecked(True)
-            return
-        elif key == Qt.Key.Key_Alt:
-            if self.parent_dialog:
-                self.parent_dialog.chk_alt.setChecked(True)
-            return
-
-        # Captura de teclas especiais sem fechar o diálogo no Escape
-        if key == Qt.Key.Key_Escape:
-            self.setText("Esc")
-            event.accept()
-            return
-        elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-            self.setText("Enter")
-            event.accept()
-            return
-        elif key == Qt.Key.Key_Space:
-            self.setText("Space")
-            event.accept()
-            return
-        elif key == Qt.Key.Key_Tab:
-            self.setText("Tab")
-            event.accept()
-            return
-        elif key == Qt.Key.Key_Backspace:
-            self.setText("")
-            event.accept()
-            return
-
-        seq_text = QKeySequence(key).toString()
-        if seq_text:
-            self.setText(seq_text.upper())
-            event.accept()
-            return
-
-        super().keyPressEvent(event)
-
 class AddShortcutDialog(QDialog):
-    """Modal Interativo para Criar e Salvar Novo Atalho no Hyprland."""
+    """Modal Interativo para Criar e Salvar Novo Atalho no Hyprland com foco em navegação por teclado."""
     def __init__(self, theme: dict, parent=None):
         super().__init__(parent)
         self.setObjectName("AddShortcutDialog")
         self.theme = theme
         self.setWindowTitle("Cadastrar Novo Atalho")
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
-        self.resize(620, 560)
+        self.resize(640, 580)
         self.setup_ui()
+
+    def keyPressEvent(self, event: QKeyEvent):
+        # Quando NÃO estiver gravando atalho, a tecla ESC fecha normalmente a janela
+        if event.key() == Qt.Key.Key_Escape:
+            if not self.key_recorder.is_recording:
+                self.reject()
+                return
+        super().keyPressEvent(event)
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
@@ -105,41 +57,20 @@ class AddShortcutDialog(QDialog):
         layout.addWidget(title)
         layout.addWidget(desc)
 
-        # Opção especial: Tecla Super Avulsa (Release / Ao Soltar)
-        self.chk_standalone_super = QCheckBox("⚡ Usar apenas a tecla Super avulsa (ao soltar / tap)", self)
-        self.chk_standalone_super.setStyleSheet(
-            f"font-weight: bold; color: {self.theme['ACCENT_PRIMARY']}; padding: 4px;"
-        )
-        self.chk_standalone_super.stateChanged.connect(self.on_standalone_super_toggled)
-        layout.addWidget(self.chk_standalone_super)
-
-        lbl_mod = QLabel("1. Teclas Modificadoras:", self)
+        # 1. Gravador Inteligente de Atalhos
+        lbl_mod = QLabel("1. Combinação de Teclas:", self)
         lbl_mod.setObjectName("SectionLabel")
         layout.addWidget(lbl_mod)
 
-        mod_box = QHBoxLayout()
-        self.chk_super = QCheckBox("Super", self)
-        self.chk_super.setChecked(True)
-        self.chk_ctrl = QCheckBox("Ctrl", self)
-        self.chk_shift = QCheckBox("Shift", self)
-        self.chk_alt = QCheckBox("Alt", self)
+        self.key_recorder = KeySequenceRecorder(initial_combo="Super + Return", theme=self.theme, parent=self)
+        self.key_recorder.keySequenceChanged.connect(self.update_preview)
+        layout.addWidget(self.key_recorder)
 
-        for c in (self.chk_super, self.chk_ctrl, self.chk_shift, self.chk_alt):
-            c.stateChanged.connect(self.update_preview)
-            mod_box.addWidget(c)
-        mod_box.addStretch()
-        layout.addLayout(mod_box)
-
+        # Grade com parâmetros
         grid = QGridLayout()
         grid.setSpacing(10)
 
-        grid.addWidget(QLabel("2. Tecla Principal:"), 0, 0)
-        self.key_input = KeyCaptureLineEdit(self)
-        self.key_input.setPlaceholderText("Pressione ou digite a tecla (Ex: Esc, Return, Space, W, 5, F1)...")
-        self.key_input.textChanged.connect(self.update_preview)
-        grid.addWidget(self.key_input, 0, 1)
-
-        grid.addWidget(QLabel("3. Categoria:"), 1, 0)
+        grid.addWidget(QLabel("2. Categoria:"), 0, 0)
         self.cat_combo = QComboBox(self)
         self.cat_combo.addItems([
             "🚀 [APLICATIVO]",
@@ -148,9 +79,9 @@ class AddShortcutDialog(QDialog):
             "🌌 [NOCTALIA]",
             "⭐ [CUSTOM]"
         ])
-        grid.addWidget(self.cat_combo, 1, 1)
+        grid.addWidget(self.cat_combo, 0, 1)
 
-        grid.addWidget(QLabel("4. Tipo de Ação:"), 2, 0)
+        grid.addWidget(QLabel("3. Tipo de Ação:"), 1, 0)
         self.action_type_combo = QComboBox(self)
         self.action_type_combo.addItems([
             "Abrir Aplicativo / Executar Comando",
@@ -160,20 +91,20 @@ class AddShortcutDialog(QDialog):
             "Comando Lua Livre do Hyprland"
         ])
         self.action_type_combo.currentIndexChanged.connect(self.on_action_type_changed)
-        grid.addWidget(self.action_type_combo, 2, 1)
+        grid.addWidget(self.action_type_combo, 1, 1)
 
         self.action_param_label = QLabel("Comando / App:")
-        grid.addWidget(self.action_param_label, 3, 0)
+        grid.addWidget(self.action_param_label, 2, 0)
         self.action_param_input = QLineEdit(self)
         self.action_param_input.setPlaceholderText("Ex: obs, spotify, discord, telegram-desktop, code...")
         self.action_param_input.textChanged.connect(self.update_preview)
-        grid.addWidget(self.action_param_input, 3, 1)
+        grid.addWidget(self.action_param_input, 2, 1)
 
-        grid.addWidget(QLabel("5. Descrição:"), 4, 0)
+        grid.addWidget(QLabel("4. Descrição:"), 3, 0)
         self.desc_input = QLineEdit(self)
         self.desc_input.setPlaceholderText("Ex: Abrir Painel de Controle ou Focar Workspace 5")
         self.desc_input.textChanged.connect(self.update_preview)
-        grid.addWidget(self.desc_input, 4, 1)
+        grid.addWidget(self.desc_input, 3, 1)
 
         layout.addLayout(grid)
 
@@ -204,34 +135,8 @@ class AddShortcutDialog(QDialog):
         btn_box.addWidget(btn_save)
         layout.addLayout(btn_box)
 
-        self.update_preview()
-
-    def keyPressEvent(self, event: QKeyEvent):
-        # Impedir fechamento da janela ao pressionar Escape se o foco estiver no campo de tecla
-        if event.key() == Qt.Key.Key_Escape:
-            if self.key_input.hasFocus():
-                self.key_input.setText("Esc")
-                event.accept()
-                return
-        super().keyPressEvent(event)
-
-    def on_standalone_super_toggled(self, state):
-        is_standalone = self.chk_standalone_super.isChecked()
-        self.chk_super.setEnabled(not is_standalone)
-        self.chk_ctrl.setEnabled(not is_standalone)
-        self.chk_shift.setEnabled(not is_standalone)
-        self.chk_alt.setEnabled(not is_standalone)
-        self.key_input.setEnabled(not is_standalone)
-
-        if is_standalone:
-            self.chk_super.setChecked(True)
-            self.chk_ctrl.setChecked(False)
-            self.chk_shift.setChecked(False)
-            self.chk_alt.setChecked(False)
-            self.key_input.setText("")
-            self.cat_combo.setCurrentIndex(3)  # Noctalia
-            if self.action_type_combo.currentIndex() != 3:
-                self.action_type_combo.setCurrentIndex(3)
+        # Focar inicialmente no botão de gravar para navegação ágil
+        self.key_recorder.btn_record.setFocus()
         self.update_preview()
 
     def on_action_type_changed(self, idx: int):
@@ -258,25 +163,16 @@ class AddShortcutDialog(QDialog):
         self.update_preview()
 
     def is_release_bind(self) -> bool:
-        return self.chk_standalone_super.isChecked()
+        combo = self.get_readable_combo().lower()
+        return "soltar" in combo or combo in ("super", "super_l")
 
     def get_combo_string(self) -> str:
-        if self.is_release_bind():
-            return '"SUPER_L"'
         readable = self.get_readable_combo()
         return readable_key_to_lua(readable)
 
     def get_readable_combo(self) -> str:
-        if self.is_release_bind():
-            return "Super (Soltar)"
-        mods = []
-        if self.chk_super.isChecked(): mods.append("Super")
-        if self.chk_ctrl.isChecked(): mods.append("Ctrl")
-        if self.chk_shift.isChecked(): mods.append("Shift")
-        if self.chk_alt.isChecked(): mods.append("Alt")
-        key = self.key_input.text().strip() or "X"
-        mods.append(key)
-        return " + ".join(mods)
+        combo = self.key_recorder.get_combo()
+        return combo if combo else "Super + Return"
 
     def get_action_code(self) -> str:
         idx = self.action_type_combo.currentIndex()
@@ -296,6 +192,12 @@ class AddShortcutDialog(QDialog):
             return f'hl.dsp.exec_cmd("noctalia msg {clean_param}")'
         elif idx == 0:
             return f'hl.dsp.exec_cmd(launchPrefix .. "{param or "app"}")'
+        elif idx == 1:
+            ws = param or "5"
+            return f'hl.dsp.focus({{ workspace = "m~{ws}" }})'
+        elif idx == 2:
+            ws = param or "5"
+            return f'hl.dsp.window.move({{ workspace = "m~{ws}" }})'
         elif idx == 4:
             return param or 'hl.dsp.window.fullscreen()'
         return 'hl.dsp.window.fullscreen()'
@@ -306,7 +208,7 @@ class AddShortcutDialog(QDialog):
         action_lua = self.get_action_code()
         desc = self.desc_input.text().strip() or f"Ação ({readable})"
         cat = self.cat_combo.currentText()
-        
+
         if self.is_release_bind():
             preview_text = f"-- category: {cat}\n-- {desc}\npcall(hl.unbind, {combo_lua})\nhl.bind({combo_lua}, {action_lua}, {{ release = true }})"
         else:
@@ -314,20 +216,16 @@ class AddShortcutDialog(QDialog):
         self.preview_box.setText(preview_text)
 
     def save_shortcut(self):
-        is_standalone = self.is_release_bind()
-        key = self.key_input.text().strip()
-        if not is_standalone and not key:
-            QMessageBox.warning(
-                self, "Aviso",
-                "Por favor, pressione ou digite a tecla principal do atalho\n"
-                "(ou selecione a opção de 'Usar apenas a tecla Super avulsa')!"
-            )
+        combo = self.get_readable_combo()
+        if not combo:
+            QMessageBox.warning(self, "Aviso", "Por favor, grave uma combinação de teclas para o atalho.")
             return
 
-        desc = self.desc_input.text().strip() or f"Ação ({self.get_readable_combo()})"
+        desc = self.desc_input.text().strip() or f"Ação ({combo})"
         cat = self.cat_combo.currentText()
         combo_lua = self.get_combo_string()
         action_lua = self.get_action_code()
+        is_standalone = self.is_release_bind()
 
         if is_standalone:
             block = (
