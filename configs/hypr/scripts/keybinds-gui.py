@@ -373,7 +373,10 @@ class SearchLineEdit(QLineEdit):
                 return
         elif key == Qt.Key.Key_Escape:
             if self.window_ref:
-                self.window_ref.close()
+                if getattr(self.window_ref, 'is_daemon', False):
+                    self.window_ref.hide()
+                else:
+                    self.window_ref.close()
                 return
 
         super().keyPressEvent(event)
@@ -1108,12 +1111,22 @@ class KeybindsWindow(QWidget):
 
         return super().eventFilter(obj, event)
 
+    def closeEvent(self, event):
+        if self.is_daemon:
+            event.ignore()
+            self.hide()
+        else:
+            event.accept()
+
     def keyPressEvent(self, event: QKeyEvent):
         key = event.key()
         text = event.text()
 
         if key == Qt.Key.Key_Escape:
-            self.close()
+            if self.is_daemon:
+                self.hide()
+            else:
+                self.close()
             return
 
         if key == Qt.Key.Key_Down:
@@ -1354,6 +1367,7 @@ def main():
     app = app_check
     app.setApplicationName("hypr-cheatsheet")
     app.setDesktopFileName("hypr-cheatsheet")
+    app.setQuitOnLastWindowClosed(not is_daemon_arg)
 
     # Servidor local para escutar toggles instantâneos
     QLocalServer.removeServer(SINGLETON_SOCKET)
