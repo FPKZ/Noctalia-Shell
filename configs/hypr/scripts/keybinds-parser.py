@@ -135,6 +135,9 @@ ACTION_MAP = {
     "CALCULATOR": ("🚀 [APLICATIVO]", "Abrir Calculadora"),
     "kdeconnect-app": ("📱 [APLICATIVO]", "Abrir KDE Connect (Integração Celular)"),
     "btop": ("📊 [SISTEMA]", "Monitor de Recursos do Sistema (btop)"),
+    "netManagerScript": ("🌐 [REDE]", "Gerenciador de Conexões de Rede (Wi-Fi / Ethernet / DNS)"),
+    "network-manager": ("🌐 [REDE]", "Gerenciador de Conexões de Rede (Wi-Fi / Ethernet / DNS)"),
+    "nm-connection-editor": ("🌐 [REDE]", "Gerenciador de Conexões de Rede (Wi-Fi / Ethernet / DNS)"),
     "keybinds": ("❓ [AJUDA]", "Exibir este menu de atalhos")
 }
 

@@ -49,6 +49,7 @@ if command -v pacman >/dev/null 2>&1; then
         fzf
         which
         libnewt
+        network-manager-applet
     )
     echo "Instalando pacotes base do sistema..."
     sudo pacman -S --needed --noconfirm "${PACKAGES[@]}"

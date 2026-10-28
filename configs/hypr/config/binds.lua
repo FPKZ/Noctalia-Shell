@@ -138,6 +138,10 @@ hl.bind(mainMod .. " + V", hl.dsp.exec_cmd(noctCall .. "panel-toggle clipboard")
 -- Notifications
 hl.bind(mainMod .. " + A", hl.dsp.exec_cmd(noctCall .. "panel-toggle control-center notifications"))
 
+-- Network Management
+local netManagerScript = os.getenv("HOME") .. "/.local/bin/network-manager.sh"
+hl.bind(mainMod .. " + SHIFT + N", hl.dsp.exec_cmd(netManagerScript))
+
 -------------------------------
 ---- WORKSPACES & MONITORS ----
 -------------------------------

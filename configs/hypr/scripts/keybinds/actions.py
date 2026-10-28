@@ -14,7 +14,8 @@ class ActionDispatcher:
         "abrir", "terminal", "dolphin", "firefox", "calculadora",
         "kde connect", "btop", "capturar", "conta-gotas", "lançador",
         "central de controle", "wallpapers", "área de transferência",
-        "configurações", "bloquear a tela", "menu de energia", "executar"
+        "configurações", "bloquear a tela", "menu de energia", "executar",
+        "rede", "conexões"
     )
 
     def __init__(self, runner: Callable[[list[str], dict | None], Any] | None = None):
@@ -122,6 +123,12 @@ class ActionDispatcher:
         self.register_handler(
             lambda d: "menu de energia" in d,
             lambda d: self._runner(["noctalia", "msg", "panel-toggle", "session"])
+        )
+
+        # Gerenciador de Rede
+        self.register_handler(
+            lambda d: "gerenciador de conexões" in d or "rede" in d,
+            lambda d: self._runner(["bash", os.path.expanduser("~/.local/bin/network-manager.sh")])
         )
 
     def is_executable(self, desc: str) -> bool:
