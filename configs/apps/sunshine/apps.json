@@ -2,15 +2,31 @@
     "apps": [
         {
             "image-path": "desktop.png",
-            "name": "Desktop"
+            "name": "Desktop",
+            "prep-cmd": [
+                {
+                    "do": "sunshine-switch-monitor.sh reset",
+                    "undo": "sunshine-switch-monitor.sh reset"
+                }
+            ]
         },
         {
             "image-path": "desktop.png",
-            "name": "Low Res Desktop",
+            "name": "Desktop (Tela 2)",
             "prep-cmd": [
                 {
-                    "do": "xrandr --output HDMI-1 --mode 1920x1080",
-                    "undo": "xrandr --output HDMI-1 --mode 1920x1200"
+                    "do": "sunshine-switch-monitor.sh set 2",
+                    "undo": "sunshine-switch-monitor.sh reset"
+                }
+            ]
+        },
+        {
+            "image-path": "desktop.png",
+            "name": "Desktop (Tela 3)",
+            "prep-cmd": [
+                {
+                    "do": "sunshine-switch-monitor.sh set 3",
+                    "undo": "sunshine-switch-monitor.sh reset"
                 }
             ]
         },

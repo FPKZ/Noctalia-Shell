@@ -167,7 +167,7 @@ while IFS= read -r sel_app; do
     rsync -a \
         --exclude="Cache" --exclude="*Cache*" --exclude="GPUCache" --exclude="Code Cache" \
         --exclude="DawnCache" --exclude="blob_storage" --exclude="Service Worker" \
-        --exclude="IndexedDB" --exclude="Crashpad" --exclude="*.log" --exclude="*.tmp" \
+        --exclude="IndexedDB" --exclude="Crashpad" --exclude="*.log*" --exclude="*.tmp" \
         --exclude="Session Storage" --exclude="logs" --exclude="Dictionaries" \
         --exclude="app-*" --exclude="*.asar" --exclude="*.so*" --exclude="*.node" \
         --exclude="*.pak" --exclude="*.bin" --exclude="discord_asset_cache" \

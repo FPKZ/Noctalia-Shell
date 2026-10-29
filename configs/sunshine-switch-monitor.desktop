@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Alternar Tela do Stream
+Comment=Alterna entre os monitores no streaming do Sunshine / Moonlight
+Exec=sunshine-switch-monitor.sh cycle
+Icon=video-display
+Terminal=false
+Type=Application
+Categories=Utility;AudioVideo;
+Keywords=sunshine;moonlight;stream;monitor;display;tela;

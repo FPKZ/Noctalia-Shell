@@ -138,6 +138,8 @@ ACTION_MAP = {
     "netManagerScript": ("🌐 [REDE]", "Gerenciador de Conexões de Rede (Wi-Fi / Ethernet / DNS)"),
     "network-manager": ("🌐 [REDE]", "Gerenciador de Conexões de Rede (Wi-Fi / Ethernet / DNS)"),
     "nm-connection-editor": ("🌐 [REDE]", "Gerenciador de Conexões de Rede (Wi-Fi / Ethernet / DNS)"),
+    "streamMonitorScript": ("🎮 [STREAM]", "Alternar entre telas no stream do Sunshine / Moonlight"),
+    "sunshine-switch-monitor": ("🎮 [STREAM]", "Alternar entre telas no stream do Sunshine / Moonlight"),
     "keybinds": ("❓ [AJUDA]", "Exibir este menu de atalhos")
 }
 

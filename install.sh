@@ -200,6 +200,13 @@ if [ -d "$SCRIPT_DIR/bin" ]; then
     chmod +x "$TARGET_HOME/.local/bin/"* 2>/dev/null || true
 fi
 
+# Atalhos de aplicativos de usuário (.desktop)
+if [ -f "$SCRIPT_DIR/configs/sunshine-switch-monitor.desktop" ]; then
+    mkdir -p "$TARGET_HOME/.local/share/applications"
+    cp "$SCRIPT_DIR/configs/sunshine-switch-monitor.desktop" "$TARGET_HOME/.local/share/applications/"
+    update-desktop-database "$TARGET_HOME/.local/share/applications" 2>/dev/null || true
+fi
+
 # 5. Instalação e Configuração dos Aplicativos Selecionados
 echo ""
 echo "-> [5/8] Instalando aplicativos opcionais selecionados e restaurando dados..."

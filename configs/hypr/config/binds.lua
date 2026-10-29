@@ -142,6 +142,11 @@ hl.bind(mainMod .. " + A", hl.dsp.exec_cmd(noctCall .. "panel-toggle control-cen
 local netManagerScript = os.getenv("HOME") .. "/.local/bin/network-manager.sh"
 hl.bind(mainMod .. " + SHIFT + N", hl.dsp.exec_cmd(netManagerScript))
 
+-- Sunshine / Moonlight Stream Multi-Monitor Switcher
+local streamMonitorScript = os.getenv("HOME") .. "/.local/bin/sunshine-switch-monitor.sh"
+hl.bind(mainMod .. " + M", hl.dsp.exec_cmd(streamMonitorScript))
+hl.bind(mainMod .. " + SHIFT + M", hl.dsp.exec_cmd(streamMonitorScript))
+
 -------------------------------
 ---- WORKSPACES & MONITORS ----
 -------------------------------

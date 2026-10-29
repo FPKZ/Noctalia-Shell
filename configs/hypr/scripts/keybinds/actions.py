@@ -15,7 +15,7 @@ class ActionDispatcher:
         "kde connect", "btop", "capturar", "conta-gotas", "lançador",
         "central de controle", "wallpapers", "área de transferência",
         "configurações", "bloquear a tela", "menu de energia", "executar",
-        "rede", "conexões"
+        "rede", "conexões", "stream"
     )
 
     def __init__(self, runner: Callable[[list[str], dict | None], Any] | None = None):
@@ -129,6 +129,12 @@ class ActionDispatcher:
         self.register_handler(
             lambda d: "gerenciador de conexões" in d or "rede" in d,
             lambda d: self._runner(["bash", os.path.expanduser("~/.local/bin/network-manager.sh")])
+        )
+
+        # Alternador de Telas Sunshine / Moonlight
+        self.register_handler(
+            lambda d: "stream" in d or "alternar entre telas" in d,
+            lambda d: self._runner(["bash", os.path.expanduser("~/.local/bin/sunshine-switch-monitor.sh")])
         )
 
     def is_executable(self, desc: str) -> bool:
